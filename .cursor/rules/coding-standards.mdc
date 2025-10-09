@@ -1,0 +1,256 @@
+# Стандарты кодирования ani-light-backend
+
+## TypeScript конфигурация
+
+### Основные настройки:
+
+- **Target**: ES2023
+- **Module**: nodenext с moduleResolution: nodenext
+- **Strict режим**: частично включен (strictNullChecks: true, noImplicitAny: false)
+- **Decorators**: включены (experimentalDecorators: true, emitDecoratorMetadata: true)
+
+### Обязательные правила:
+
+- Всегда используйте строгую типизацию где возможно
+- Избегайте `any`, предпочитайте конкретные типы
+- Используйте `interface` для описания структур данных
+- Применяйте `type` для union types и сложных типов
+
+## ESLint правила
+
+### Активные правила:
+
+```javascript
+{
+  '@typescript-eslint/no-explicit-any': 'off',           // any разрешен
+  '@typescript-eslint/no-floating-promises': 'warn',     // предупреждение о неожиданных Promise
+  '@typescript-eslint/no-unsafe-argument': 'warn',       // предупреждение о небезопасных аргументах
+  '@typescript-eslint/no-unsafe-call': 'off',            // небезопасные вызовы разрешены
+  '@typescript-eslint/no-unsafe-member-access': 'off',   // доступ к членам разрешен
+  '@typescript-eslint/no-unsafe-return': 'off',          // небезопасный return разрешен
+  '@typescript-eslint/no-unsafe-assignment': 'off',      // небезопасные присваивания разрешены
+  'prettier/prettier': ['error', { endOfLine: 'auto' }]  // автоматические окончания строк
+}
+```
+
+### Правила именования:
+
+#### Файлы и папки:
+
+- **Контроллеры**: `feature.controller.ts`
+- **Сервисы**: `feature.service.ts`
+- **Сущности**: `feature.entity.ts`
+- **DTO**: `feature.dto.ts`
+- **Тесты**: `feature.spec.ts`
+- **Модули**: `feature.module.ts`
+- **Папки модулей**: `kebab-case` (например, `anime`, `episode`)
+
+#### Классы и интерфейсы:
+
+- **Классы**: `PascalCase` (например, `AnimeService`, `AnimeController`)
+- **Интерфейсы**: `PascalCase` с префиксом `I` при необходимости
+- **Типы**: `PascalCase`
+- **Enums**: `PascalCase`
+
+#### Переменные и методы:
+
+- **Переменные**: `camelCase`
+- **Константы**: `UPPER_SNAKE_CASE`
+- **Методы**: `camelCase`
+- **Приватные методы**: `camelCase` с префиксом `private`
+
+## Prettier конфигурация
+
+### Настройки форматирования:
+
+- **endOfLine**: 'auto' (автоматическое определение)
+- Используйте команду `yarn format` для форматирования кода
+- Prettier интегрирован с ESLint
+
+## Импорты
+
+### Правила организации импортов:
+
+1. **Внешние библиотеки** (Node.js, npm пакеты)
+2. **NestJS модули** (@nestjs/\*)
+3. **Внутренние модули** (относительные пути)
+
+### Пример правильной организации:
+
+```typescript
+import { HttpService } from '@nestjs/axios';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Cron } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Cache } from 'cache-manager';
+import * as dotenv from 'dotenv';
+import { lastValueFrom } from 'rxjs';
+import { Repository } from 'typeorm';
+import { Episode } from '../episode/entities/episode.entity';
+import { GetAnimeListDto } from './dto/anime.dto';
+import { Anime } from './entities/anime.entity';
+```
+
+### Правила импортов:
+
+- Используйте `type` импорты для типов: `import type { Cache } from 'cache-manager'`
+- Группируйте импорты логически
+- Избегайте wildcard импортов кроме случаев с namespace (например, `* as dotenv`)
+
+## Декораторы NestJS
+
+### Контроллеры:
+
+```typescript
+@Controller('anime')  // kebab-case для URL
+export class AnimeController {
+  @Get()              // HTTP методы
+  @Get(':id')         // параметры маршрута
+  @Get(':id/episodes') // вложенные ресурсы
+}
+```
+
+### Сервисы:
+
+```typescript
+@Injectable()
+export class AnimeService {
+  @Cron('0 0 * * *') // cron выражения
+  async syncData() {}
+}
+```
+
+### Сущности:
+
+```typescript
+@Entity()
+export class Anime {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  title_ru: string;
+
+  @Column({ nullable: true })
+  optional_field?: string;
+
+  @OneToMany(() => Episode, (episode) => episode.anime)
+  episodes: Episode[];
+}
+```
+
+## Валидация данных
+
+### DTO классы:
+
+```typescript
+export class GetAnimeListDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsNumber()
+  year?: number;
+}
+```
+
+### Правила валидации:
+
+- Используйте `class-validator` декораторы
+- `@IsOptional()` для необязательных полей
+- Специфичные валидаторы: `@IsString()`, `@IsNumber()`, `@IsEmail()` и т.д.
+
+## Обработка асинхронности
+
+### Promise vs Observable:
+
+- Используйте `async/await` для асинхронных операций
+- Конвертируйте Observable в Promise: `lastValueFrom(observable)`
+- Избегайте смешивания Promise и Observable в одном методе
+
+### Пример:
+
+```typescript
+async getAnimeDetails(id: string) {
+  const cacheKey = `anime_${id}`;
+  let anime = await this.cacheManager.get<Anime>(cacheKey);
+
+  if (!anime) {
+    anime = await this.animeRepo.findOne({
+      where: { id },
+      relations: ['episodes'],
+    });
+    await this.cacheManager.set(cacheKey, anime, 3600);
+  }
+
+  return anime;
+}
+```
+
+## Комментарии и документация
+
+### Правила комментирования:
+
+- Комментарии на **русском языке**
+- Объясняйте **почему**, а не **что**
+- Документируйте сложную бизнес-логику
+- Используйте JSDoc для публичных методов
+
+### Пример:
+
+```typescript
+/**
+ * Синхронизирует данные аниме с внешним API
+ * Выполняется каждый день в полночь
+ */
+@Cron('0 0 * * *')
+async syncAnimeData() {
+  // Получаем список тайтлов из API
+  const titles = await this.fetchFromApi('/titles');
+  // ... логика синхронизации
+}
+```
+
+## Обработка ошибок
+
+### Стратегия:
+
+- Не используйте `try-catch` без необходимости
+- Позволяйте NestJS обрабатывать исключения автоматически
+- Логируйте ошибки в критических местах
+- Используйте HTTP исключения для API ошибок
+
+### Пример:
+
+```typescript
+async getAnimeDetails(id: string) {
+  const anime = await this.animeRepo.findOne({ where: { id } });
+
+  if (!anime) {
+    throw new NotFoundException(`Anime with id ${id} not found`);
+  }
+
+  return anime;
+}
+```
+
+## Константы и конфигурация
+
+### Правила:
+
+- Выносите магические числа в константы
+- Используйте `ConfigService` для переменных окружения
+- Группируйте константы в начале файла или отдельных файлах
+
+### Пример:
+
+```typescript
+const CACHE_TTL = 3600; // 1 час
+const API_ENDPOINTS = {
+  TITLES: '/titles',
+  EPISODES: '/title/{id}/episodes',
+} as const;
+```

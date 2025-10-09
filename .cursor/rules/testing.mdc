@@ -1,0 +1,516 @@
+# Правила тестирования
+
+## Общие принципы тестирования
+
+### Типы тестов:
+
+- **Unit тесты** - тестирование отдельных компонентов (сервисы, контроллеры)
+- **Integration тесты** - тестирование взаимодействия компонентов
+- **E2E тесты** - тестирование полного пути запроса через API
+
+### Структура тестов:
+
+- **Unit тесты**: рядом с исходным кодом (`*.spec.ts`)
+- **E2E тесты**: в папке `test/` (`*.e2e-spec.ts`)
+- **Покрытие кода**: в папке `coverage/`
+
+## Jest конфигурация
+
+### Основные настройки:
+
+```json
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "src",
+  "testRegex": ".*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "collectCoverageFrom": ["**/*.(t|j)s"],
+  "coverageDirectory": "../coverage",
+  "testEnvironment": "node"
+}
+```
+
+### Команды тестирования:
+
+```bash
+# Запуск всех тестов
+yarn test
+
+# Запуск в watch режиме
+yarn test:watch
+
+# Покрытие кода
+yarn test:cov
+
+# E2E тесты
+yarn test:e2e
+
+# Отладка тестов
+yarn test:debug
+```
+
+## Unit тесты для сервисов
+
+### Базовая структура:
+
+```typescript
+import { HttpService } from '@nestjs/axios';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Episode } from '../episode/entities/episode.entity';
+import { AnimeService } from './anime.service';
+import { Anime } from './entities/anime.entity';
+
+describe('AnimeService', () => {
+  let service: AnimeService;
+  let animeRepo: Repository<Anime>;
+  let episodeRepo: Repository<Episode>;
+  let cacheManager: any;
+  let httpService: HttpService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AnimeService,
+        {
+          provide: getRepositoryToken(Anime),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(Episode),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+          },
+        },
+        {
+          provide: HttpService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<AnimeService>(AnimeService);
+    animeRepo = module.get<Repository<Anime>>(getRepositoryToken(Anime));
+    episodeRepo = module.get<Repository<Episode>>(getRepositoryToken(Episode));
+    cacheManager = module.get(CACHE_MANAGER);
+    httpService = module.get<HttpService>(HttpService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('getAnimeDetails', () => {
+    it('should return anime from cache if exists', async () => {
+      const mockAnime = { id: '1', title_ru: 'Test Anime' };
+      cacheManager.get.mockResolvedValue(mockAnime);
+
+      const result = await service.getAnimeDetails('1');
+
+      expect(cacheManager.get).toHaveBeenCalledWith('anime_1');
+      expect(result).toEqual(mockAnime);
+    });
+
+    it('should fetch anime from database if not in cache', async () => {
+      const mockAnime = { id: '1', title_ru: 'Test Anime' };
+      cacheManager.get.mockResolvedValue(null);
+      animeRepo.findOne.mockResolvedValue(mockAnime);
+
+      const result = await service.getAnimeDetails('1');
+
+      expect(animeRepo.findOne).toHaveBeenCalledWith({
+        where: { id: '1' },
+        relations: ['episodes'],
+      });
+      expect(cacheManager.set).toHaveBeenCalledWith('anime_1', mockAnime, 3600);
+      expect(result).toEqual(mockAnime);
+    });
+  });
+});
+```
+
+### Правила тестирования сервисов:
+
+- **Мокайте все зависимости** (репозитории, HTTP-клиенты, кэш)
+- **Тестируйте каждый публичный метод**
+- **Проверяйте различные сценарии** (успех, ошибка, граничные случаи)
+- **Используйте описательные названия тестов**
+- **Группируйте тесты** по методам с `describe()`
+
+## Unit тесты для контроллеров
+
+### Базовая структура:
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { AnimeController } from './anime.controller';
+import { AnimeService } from './anime.service';
+
+describe('AnimeController', () => {
+  let controller: AnimeController;
+  let service: AnimeService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [AnimeController],
+      providers: [
+        {
+          provide: AnimeService,
+          useValue: {
+            getAnimeList: jest.fn(),
+            getAnimeDetails: jest.fn(),
+            getEpisodes: jest.fn(),
+            searchAnime: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    controller = module.get<AnimeController>(AnimeController);
+    service = module.get<AnimeService>(AnimeService);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
+  describe('getAnimeList', () => {
+    it('should return anime list', async () => {
+      const mockQuery = { search: 'test' };
+      const mockResult = [{ id: '1', title_ru: 'Test Anime' }];
+      service.getAnimeList.mockResolvedValue(mockResult);
+
+      const result = await controller.getAnimeList(mockQuery);
+
+      expect(service.getAnimeList).toHaveBeenCalledWith(mockQuery);
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('getAnimeDetails', () => {
+    it('should return anime details', async () => {
+      const mockAnime = { id: '1', title_ru: 'Test Anime' };
+      service.getAnimeDetails.mockResolvedValue(mockAnime);
+
+      const result = await controller.getAnimeDetails('1');
+
+      expect(service.getAnimeDetails).toHaveBeenCalledWith('1');
+      expect(result).toEqual(mockAnime);
+    });
+  });
+});
+```
+
+### Правила тестирования контроллеров:
+
+- **Мокайте только сервисы** (контроллеры - тонкий слой)
+- **Тестируйте передачу параметров** в сервисы
+- **Проверяйте возвращаемые значения**
+- **Не тестируйте бизнес-логику** (она в сервисах)
+
+## E2E тесты
+
+### Базовая структура:
+
+```typescript
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import * as request from 'supertest';
+import { Repository } from 'typeorm';
+import { AppModule } from '../src/app.module';
+import { Anime } from '../src/modules/anime/entities/anime.entity';
+
+describe('AnimeController (e2e)', () => {
+  let app: INestApplication;
+  let animeRepo: Repository<Anime>;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    animeRepo = moduleFixture.get<Repository<Anime>>(getRepositoryToken(Anime));
+
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    // Очистка базы данных перед каждым тестом
+    await animeRepo.clear();
+  });
+
+  describe('/anime (GET)', () => {
+    it('should return empty array when no anime exists', () => {
+      return request(app.getHttpServer()).get('/anime').expect(200).expect([]);
+    });
+
+    it('should return anime list', async () => {
+      // Подготовка данных
+      const anime = animeRepo.create({
+        title_ru: 'Test Anime',
+        title_en: 'Test Anime EN',
+        description: 'Test Description',
+        genres: ['Action'],
+        year: 2023,
+        poster_url: 'http://example.com/poster.jpg',
+      });
+      await animeRepo.save(anime);
+
+      return request(app.getHttpServer())
+        .get('/anime')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveLength(1);
+          expect(res.body[0].title_ru).toBe('Test Anime');
+        });
+    });
+  });
+
+  describe('/anime/:id (GET)', () => {
+    it('should return anime details', async () => {
+      const anime = animeRepo.create({
+        title_ru: 'Test Anime',
+        title_en: 'Test Anime EN',
+        description: 'Test Description',
+        genres: ['Action'],
+        year: 2023,
+        poster_url: 'http://example.com/poster.jpg',
+      });
+      const savedAnime = await animeRepo.save(anime);
+
+      return request(app.getHttpServer())
+        .get(`/anime/${savedAnime.id}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.id).toBe(savedAnime.id);
+          expect(res.body.title_ru).toBe('Test Anime');
+        });
+    });
+
+    it('should return 404 for non-existent anime', () => {
+      return request(app.getHttpServer())
+        .get('/anime/non-existent-id')
+        .expect(404);
+    });
+  });
+});
+```
+
+### Правила E2E тестирования:
+
+- **Используйте тестовую базу данных**
+- **Очищайте данные** между тестами
+- **Тестируйте полные HTTP-запросы**
+- **Проверяйте статус-коды и тела ответов**
+- **Тестируйте аутентификацию и авторизацию**
+
+## Тестирование с базой данных
+
+### Настройка тестовой базы:
+
+```typescript
+// test/test-db.config.ts
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+
+export const testDbConfig: TypeOrmModuleOptions = {
+  type: 'postgres',
+  host: 'localhost',
+  port: 5433, // отдельный порт для тестов
+  username: 'test_user',
+  password: 'test_password',
+  database: 'test_db',
+  entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
+  synchronize: true, // только для тестов!
+  dropSchema: true, // очистка перед каждым запуском
+};
+```
+
+### Использование в тестах:
+
+```typescript
+beforeAll(async () => {
+  const module = await Test.createTestingModule({
+    imports: [
+      TypeOrmModule.forRoot(testDbConfig),
+      // другие модули
+    ],
+  }).compile();
+
+  app = module.createNestApplication();
+  await app.init();
+});
+```
+
+## Моки и стабы
+
+### Мокирование внешних сервисов:
+
+```typescript
+// Мокирование HTTP-запросов
+const mockHttpService = {
+  get: jest.fn().mockReturnValue(of({ data: { id: 1, name: 'Test' } })),
+};
+
+// Мокирование кэша
+const mockCacheManager = {
+  get: jest.fn(),
+  set: jest.fn(),
+};
+
+// Мокирование репозитория
+const mockRepository = {
+  findOne: jest.fn(),
+  find: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  delete: jest.fn(),
+  createQueryBuilder: jest.fn().mockReturnValue({
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    getMany: jest.fn(),
+    getOne: jest.fn(),
+  }),
+};
+```
+
+### Правила мокирования:
+
+- **Мокайте внешние зависимости** (API, база данных, файловая система)
+- **Используйте реальные объекты** для простых случаев
+- **Создавайте фабрики** для сложных моков
+- **Сбрасывайте моки** между тестами
+
+## Тестовые данные
+
+### Фабрики для создания тестовых данных:
+
+```typescript
+// test/factories/anime.factory.ts
+export class AnimeFactory {
+  static create(overrides: Partial<Anime> = {}): Anime {
+    return {
+      id: 'test-id',
+      title_ru: 'Тестовое аниме',
+      title_en: 'Test Anime',
+      description: 'Описание тестового аниме',
+      genres: ['Action', 'Adventure'],
+      year: 2023,
+      poster_url: 'http://example.com/poster.jpg',
+      episodes: [],
+      ...overrides,
+    };
+  }
+
+  static createMany(count: number, overrides: Partial<Anime> = {}): Anime[] {
+    return Array.from({ length: count }, (_, index) =>
+      this.create({ ...overrides, id: `test-id-${index}` }),
+    );
+  }
+}
+```
+
+### Правила тестовых данных:
+
+- **Используйте фабрики** для создания объектов
+- **Минимальные данные** для тестов
+- **Описательные значения** (не случайные)
+- **Переиспользуйте** общие данные
+
+## Покрытие кода
+
+### Цели покрытия:
+
+- **Unit тесты**: минимум 80% покрытия
+- **Критичные модули**: 90%+ покрытия
+- **Утилиты и хелперы**: 100% покрытия
+
+### Метрики покрытия:
+
+- **Lines**: покрытие строк кода
+- **Functions**: покрытие функций
+- **Branches**: покрытие условных переходов
+- **Statements**: покрытие инструкций
+
+### Исключения из покрытия:
+
+```typescript
+// Исключение строки
+const result = someFunction(); // istanbul ignore next
+
+// Исключение блока
+/* istanbul ignore next */
+if (process.env.NODE_ENV === 'development') {
+  console.log('Debug info');
+}
+```
+
+## Непрерывная интеграция
+
+### GitHub Actions пример:
+
+```yaml
+name: Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - run: yarn install
+      - run: yarn test
+      - run: yarn test:e2e
+      - run: yarn test:cov
+```
+
+### Правила CI/CD:
+
+- **Запускайте тесты** на каждый push
+- **Блокируйте merge** при падении тестов
+- **Собирайте покрытие** и отслеживайте изменения
+- **Уведомляйте команду** о проблемах

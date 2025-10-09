@@ -1,0 +1,440 @@
+# Правила для API и контроллеров
+
+## Структура контроллеров
+
+### Базовая структура:
+
+```typescript
+@Controller('resource')
+export class ResourceController {
+  constructor(private readonly resourceService: ResourceService) {}
+
+  @Get()
+  async getList(@Query() query: GetResourceListDto) {
+    return this.resourceService.getList(query);
+  }
+
+  @Get(':id')
+  async getDetails(@Param('id') id: string) {
+    return this.resourceService.getDetails(id);
+  }
+}
+```
+
+### Правила именования:
+
+- **Контроллер**: `ResourceController`
+- **Маршрут**: `kebab-case` в декораторе `@Controller('resource')`
+- **Методы**: `camelCase`, описательные имена
+- **Параметры**: соответствуют назначению (`id`, `query`, `body`)
+
+## HTTP методы и маршруты
+
+### Стандартные CRUD операции:
+
+```typescript
+@Controller('anime')
+export class AnimeController {
+  @Get() // GET /anime - список
+  async getAnimeList() {}
+
+  @Get(':id') // GET /anime/:id - детали
+  async getAnimeDetails() {}
+
+  @Get(':id/episodes') // GET /anime/:id/episodes - вложенные ресурсы
+  async getEpisodes() {}
+
+  @Get('search') // GET /anime/search - поиск (до :id!)
+  async searchAnime() {}
+
+  @Post() // POST /anime - создание
+  async createAnime() {}
+
+  @Put(':id') // PUT /anime/:id - полное обновление
+  async updateAnime() {}
+
+  @Patch(':id') // PATCH /anime/:id - частичное обновление
+  async patchAnime() {}
+
+  @Delete(':id') // DELETE /anime/:id - удаление
+  async deleteAnime() {}
+}
+```
+
+### Правила маршрутизации:
+
+- **Статические маршруты** (`search`) должны идти **до параметризованных** (`:id`)
+- **Вложенные ресурсы** используют формат `:id/subresource`
+- **Действия над ресурсом** используют формат `:id/action`
+- **Избегайте глубокой вложенности** (максимум 2 уровня)
+
+## Параметры запросов
+
+### Query параметры:
+
+```typescript
+@Get()
+async getList(@Query() query: GetResourceListDto) {
+  // query содержит все параметры из URL (?search=value&page=1)
+  return this.service.getList(query);
+}
+
+// Для отдельных параметров
+@Get('search')
+async search(@Query('q') searchQuery: string) {
+  return this.service.search(searchQuery);
+}
+```
+
+### Path параметры:
+
+```typescript
+@Get(':id')
+async getDetails(@Param('id') id: string) {
+  return this.service.getDetails(id);
+}
+
+// Множественные параметры
+@Get(':animeId/episodes/:episodeId')
+async getEpisode(
+  @Param('animeId') animeId: string,
+  @Param('episodeId') episodeId: string,
+) {
+  return this.service.getEpisode(animeId, episodeId);
+}
+```
+
+### Body параметры:
+
+```typescript
+@Post()
+async create(@Body() createDto: CreateResourceDto) {
+  return this.service.create(createDto);
+}
+
+@Put(':id')
+async update(
+  @Param('id') id: string,
+  @Body() updateDto: UpdateResourceDto,
+) {
+  return this.service.update(id, updateDto);
+}
+```
+
+## DTO (Data Transfer Objects)
+
+### Структура DTO:
+
+```typescript
+export class GetAnimeListDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  genre?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1900)
+  @Max(2030)
+  year?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+```
+
+### Правила создания DTO:
+
+- **Отдельный DTO** для каждого типа операции
+- **Валидация** всех входящих данных
+- **Опциональные поля** с `@IsOptional()`
+- **Значения по умолчанию** для пагинации
+- **Ограничения** на числовые значения
+
+### Типы DTO:
+
+- `GetResourceListDto` - для списков с фильтрами
+- `CreateResourceDto` - для создания
+- `UpdateResourceDto` - для обновления
+- `SearchDto` - для поиска
+- `ResourceParamsDto` - для параметров маршрута
+
+## Валидация входящих данных
+
+### Декораторы валидации:
+
+```typescript
+export class CreateAnimeDto {
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(255)
+  title_ru: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  title_en?: string;
+
+  @IsNotEmpty()
+  @IsString()
+  description: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  genres: string[];
+
+  @IsNumber()
+  @Min(1900)
+  @Max(2030)
+  year: number;
+
+  @IsUrl()
+  poster_url: string;
+}
+```
+
+### Правила валидации:
+
+- **Всегда валидируйте** входящие данные
+- **Используйте специфичные валидаторы**: `@IsEmail()`, `@IsUrl()`, `@IsUUID()`
+- **Ограничивайте длину строк**: `@MaxLength()`
+- **Проверяйте диапазоны чисел**: `@Min()`, `@Max()`
+- **Валидируйте массивы**: `@IsArray()`, `{ each: true }`
+
+## Обработка ошибок
+
+### HTTP исключения:
+
+```typescript
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+  ForbiddenException,
+  ConflictException,
+  InternalServerErrorException
+} from '@nestjs/common';
+
+@Get(':id')
+async getDetails(@Param('id') id: string) {
+  const anime = await this.animeService.getDetails(id);
+
+  if (!anime) {
+    throw new NotFoundException(`Anime with id ${id} not found`);
+  }
+
+  return anime;
+}
+```
+
+### Коды ошибок:
+
+- **400 Bad Request** - неверные данные запроса
+- **401 Unauthorized** - требуется аутентификация
+- **403 Forbidden** - нет прав доступа
+- **404 Not Found** - ресурс не найден
+- **409 Conflict** - конфликт данных (дублирование)
+- **422 Unprocessable Entity** - ошибки валидации
+- **500 Internal Server Error** - внутренняя ошибка сервера
+
+## Ответы API
+
+### Структура успешных ответов:
+
+```typescript
+// Простой объект
+@Get(':id')
+async getDetails(@Param('id') id: string) {
+  return {
+    id: anime.id,
+    title_ru: anime.title_ru,
+    title_en: anime.title_en,
+    description: anime.description,
+    genres: anime.genres,
+    year: anime.year,
+    poster_url: anime.poster_url,
+    episodes: anime.episodes,
+  };
+}
+
+// Список с метаданными
+@Get()
+async getList(@Query() query: GetAnimeListDto) {
+  const { items, total } = await this.animeService.getList(query);
+
+  return {
+    data: items,
+    meta: {
+      total,
+      page: query.page || 1,
+      limit: query.limit || 20,
+      totalPages: Math.ceil(total / (query.limit || 20)),
+    },
+  };
+}
+```
+
+### Правила формирования ответов:
+
+- **Консистентная структура** для всех эндпоинтов
+- **Метаданные** для списков (пагинация, общее количество)
+- **Плоская структура** для простых объектов
+- **Вложенные объекты** только при необходимости
+
+## Пагинация
+
+### Стандартная пагинация:
+
+```typescript
+export class PaginationDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+
+// В контроллере
+@Get()
+async getList(@Query() query: GetAnimeListDto) {
+  const page = query.page || 1;
+  const limit = query.limit || 20;
+  const offset = (page - 1) * limit;
+
+  return this.animeService.getList({ ...query, offset, limit });
+}
+```
+
+### Правила пагинации:
+
+- **Страницы начинаются с 1** (не с 0)
+- **Лимит по умолчанию**: 20 элементов
+- **Максимальный лимит**: 100 элементов
+- **Всегда возвращайте метаданные** пагинации
+
+## Фильтрация и поиск
+
+### Фильтрация:
+
+```typescript
+export class GetAnimeListDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  search?: string; // поиск по названию
+
+  @IsOptional()
+  @IsString()
+  genre?: string; // фильтр по жанру
+
+  @IsOptional()
+  @IsNumber()
+  year?: number; // фильтр по году
+
+  @IsOptional()
+  @IsEnum(['asc', 'desc'])
+  sort?: 'asc' | 'desc' = 'desc'; // сортировка
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string = 'createdAt'; // поле сортировки
+}
+```
+
+### Правила фильтрации:
+
+- **Опциональные фильтры** с `@IsOptional()`
+- **Поиск по тексту** через `ILIKE` для PostgreSQL
+- **Точные совпадения** для категориальных данных
+- **Диапазоны** для числовых значений
+- **Сортировка** с указанием поля и направления
+
+## CORS и безопасность
+
+### CORS настройки:
+
+```typescript
+// В main.ts
+app.enableCors({
+  origin: process.env.FRONTEND_URL || '*',
+  methods: 'GET,POST,PUT,PATCH,DELETE',
+  allowedHeaders: 'Content-Type,Authorization',
+  credentials: true,
+});
+```
+
+### Правила безопасности:
+
+- **Ограничивайте CORS** для продакшн среды
+- **Валидируйте все входящие данные**
+- **Используйте HTTPS** в продакшн
+- **Логируйте подозрительную активность**
+
+## Документация API
+
+### Swagger/OpenAPI:
+
+```typescript
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+@ApiTags('anime')
+@Controller('anime')
+export class AnimeController {
+  @ApiOperation({ summary: 'Получить список аниме' })
+  @ApiResponse({ status: 200, description: 'Список аниме успешно получен' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Поиск по названию',
+  })
+  @Get()
+  async getList(@Query() query: GetAnimeListDto) {
+    return this.animeService.getList(query);
+  }
+}
+```
+
+### Правила документирования:
+
+- **Описывайте все эндпоинты** с помощью `@ApiOperation()`
+- **Документируйте параметры** с `@ApiQuery()`, `@ApiParam()`, `@ApiBody()`
+- **Указывайте возможные ответы** с `@ApiResponse()`
+- **Группируйте эндпоинты** по тегам с `@ApiTags()`
+
+## Версионирование API
+
+### URI версионирование:
+
+```typescript
+@Controller({ path: 'anime', version: '1' })
+export class AnimeV1Controller {
+  // /v1/anime
+}
+
+@Controller({ path: 'anime', version: '2' })
+export class AnimeV2Controller {
+  // /v2/anime
+}
+```
+
+### Правила версионирования:
+
+- **Используйте семантическое версионирование**
+- **Поддерживайте старые версии** определенное время
+- **Документируйте изменения** между версиями
+- **Уведомляйте о deprecated** версиях

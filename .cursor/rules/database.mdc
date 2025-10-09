@@ -1,0 +1,525 @@
+---
+alwaysApply: true
+---
+
+# Правила работы с базой данных
+
+## TypeORM конфигурация
+
+### Основные настройки:
+
+- **База данных**: PostgreSQL
+- **ORM**: TypeORM
+- **Синхронизация**: отключена (`synchronize: false`)
+- **Миграции**: обязательны для изменения схемы
+- **Логирование**: включено для отладки
+
+### Конфигурация подключения:
+
+```typescript
+TypeOrmModule.forRootAsync({
+  imports: [ConfigModule],
+  useFactory: (config: ConfigService) => ({
+    type: 'postgres',
+    host: config.get('POSTGRES_HOST'),
+    port: config.get('POSTGRES_PORT'),
+    username: config.get('POSTGRES_USER'),
+    password: config.get('POSTGRES_PASSWORD'),
+    database: config.get('POSTGRES_DB'),
+    entities: [__dirname + './**/*.entity{.js,.ts}'],
+    migrations: [__dirname + './migrations/*{.ts,.js}'],
+    synchronize: false,
+    logging: true,
+  }),
+  inject: [ConfigService],
+});
+```
+
+## Сущности (Entities)
+
+### Правила создания сущностей:
+
+#### Базовая структура:
+
+```typescript
+@Entity()
+export class EntityName {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  // остальные поля
+}
+```
+
+#### Обязательные элементы:
+
+- **Декоратор `@Entity()`** для класса
+- **UUID как первичный ключ**: `@PrimaryGeneratedColumn('uuid')`
+- **Типизация полей**: используйте TypeScript типы + TypeORM декораторы
+
+### Типы полей:
+
+#### Строковые поля:
+
+```typescript
+@Column()                    // varchar по умолчанию
+title_ru: string;
+
+@Column('text')              // для длинного текста
+description: string;
+
+@Column({ nullable: true })   // необязательное поле
+optional_field?: string;
+```
+
+#### Числовые поля:
+
+```typescript
+@Column()
+year: number;               // integer по умолчанию
+
+@Column({ nullable: true })
+external_id?: number;       // для связи с внешними API
+```
+
+#### Массивы:
+
+```typescript
+@Column('simple-array')     // для простых массивов строк
+genres: string[];
+```
+
+#### Связи между таблицами:
+
+```typescript
+// One-to-Many
+@OneToMany(() => Episode, (episode) => episode.anime)
+@JoinColumn()
+episodes: Episode[];
+
+// Many-to-One
+@ManyToOne(() => Anime, (anime) => anime.episodes)
+@JoinColumn({ name: 'anime_id' })
+anime: Anime;
+
+@Column('uuid')             // внешний ключ
+anime_id: string;
+```
+
+### Правила именования:
+
+- **Таблицы**: snake_case (автоматически из имени класса)
+- **Поля**: snake_case в базе, camelCase в коде
+- **Внешние ключи**: `{table}_id`
+
+## Миграции
+
+### Структура миграций:
+
+```typescript
+import { Index, MigrationInterface, QueryRunner, Table } from 'typeorm';
+
+export class MigrationName1234567890123 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // создание/изменение структуры
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // откат изменений
+  }
+}
+```
+
+### КРИТИЧЕСКИ ВАЖНО: Использование TypeORM API
+
+**ВСЕГДА используйте TypeORM API вместо сырых SQL запросов в миграциях!**
+
+#### ✅ ПРАВИЛЬНО - TypeORM API:
+
+```typescript
+// Создание таблицы
+await queryRunner.createTable(
+  new Table({
+    name: 'table_name',
+    columns: [
+      {
+        name: 'id',
+        type: 'uuid',
+        isPrimary: true,
+        isGenerated: true,
+        generationStrategy: 'uuid',
+      },
+      {
+        name: 'field_name',
+        type: 'varchar',
+        isNullable: false,
+      },
+    ],
+  }),
+  true, // создать индексы
+);
+
+// Создание индекса
+await queryRunner.createIndex(
+  'table_name',
+  new Index({
+    name: 'IDX_table_field',
+    columnNames: ['field_name'],
+  }),
+);
+
+// Добавление колонки
+await queryRunner.addColumn(
+  'table_name',
+  new TableColumn({
+    name: 'new_field',
+    type: 'varchar',
+    isNullable: true,
+  }),
+);
+
+// Удаление индекса
+await queryRunner.dropIndex('table_name', 'IDX_table_field');
+
+// Удаление таблицы
+await queryRunner.dropTable('table_name');
+```
+
+#### ❌ НЕПРАВИЛЬНО - сырые SQL запросы:
+
+```typescript
+// НЕ ИСПОЛЬЗУЙТЕ ЭТО!
+await queryRunner.query(`CREATE TABLE table_name (...)`);
+await queryRunner.query(`CREATE INDEX ...`);
+await queryRunner.query(`ALTER TABLE ...`);
+```
+
+#### Исключения для специальных случаев:
+
+Сырые SQL запросы допустимы ТОЛЬКО для специфичных для PostgreSQL функций, которые не поддерживаются TypeORM API:
+
+```typescript
+// Допустимо для GIN индексов (не поддерживаются в TypeORM)
+await queryRunner.query(`
+  CREATE INDEX IF NOT EXISTS "IDX_anime_title_gin" 
+  ON "anime" USING gin(to_tsvector('russian', "title_ru"))
+`);
+
+// Допустимо для специальных PostgreSQL типов данных
+await queryRunner.query(`
+  ALTER TABLE "table_name" 
+  ADD COLUMN "search_vector" tsvector
+`);
+```
+
+### Правила создания миграций:
+
+#### Создание таблицы с TypeORM API:
+
+```typescript
+import {
+  Index,
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableColumn,
+} from 'typeorm';
+
+await queryRunner.createTable(
+  new Table({
+    name: 'anime',
+    columns: [
+      {
+        name: 'id',
+        type: 'uuid',
+        isPrimary: true,
+        isGenerated: true,
+        generationStrategy: 'uuid',
+      },
+      {
+        name: 'external_id',
+        type: 'integer',
+        isNullable: true,
+      },
+      {
+        name: 'title_ru',
+        type: 'varchar',
+        isNullable: false,
+      },
+      {
+        name: 'title_en',
+        type: 'varchar',
+        isNullable: false,
+      },
+      {
+        name: 'description',
+        type: 'text',
+        isNullable: false,
+      },
+      {
+        name: 'genres',
+        type: 'text',
+        isArray: true,
+        isNullable: false,
+      },
+      {
+        name: 'year',
+        type: 'integer',
+        isNullable: false,
+      },
+      {
+        name: 'poster_url',
+        type: 'varchar',
+        isNullable: false,
+      },
+    ],
+  }),
+  true,
+);
+```
+
+#### Создание индексов с TypeORM API:
+
+```typescript
+import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
+
+// Простой индекс
+await queryRunner.createIndex(
+  'anime',
+  new TableIndex({
+    name: 'IDX_anime_year',
+    columnNames: ['year'],
+  }),
+);
+
+// Составной индекс
+await queryRunner.createIndex(
+  'anime',
+  new TableIndex({
+    name: 'IDX_anime_year_title',
+    columnNames: ['year', 'title_ru'],
+  }),
+);
+
+// Уникальный индекс
+await queryRunner.createIndex(
+  'anime',
+  new TableIndex({
+    name: 'IDX_anime_external_id_unique',
+    columnNames: ['external_id'],
+    isUnique: true,
+  }),
+);
+
+// Удаление индексов
+await queryRunner.dropIndex('anime', 'IDX_anime_year');
+```
+
+#### Команды для работы с миграциями:
+
+```bash
+# Создать миграцию
+yarn typeorm:create src/migrations/migration-name
+
+# Сгенерировать миграцию из изменений сущностей
+yarn typeorm:generate src/migrations/migration-name
+
+# Применить миграции
+yarn typeorm:up
+
+# Откатить последнюю миграцию
+yarn typeorm:down
+```
+
+### Обязательные правила:
+
+- **Всегда создавайте миграции** для изменения схемы БД
+- **Тестируйте миграции** на копии продакшн данных
+- **Никогда не изменяйте** уже примененные миграции
+- **Всегда реализуйте** метод `down()` для отката
+
+## Репозитории
+
+### Инжекция репозиториев:
+
+```typescript
+@Injectable()
+export class FeatureService {
+  constructor(
+    @InjectRepository(Feature)
+    private featureRepo: Repository<Feature>,
+  ) {}
+}
+```
+
+### Регистрация в модуле:
+
+```typescript
+@Module({
+  imports: [TypeOrmModule.forFeature([Feature])],
+  providers: [FeatureService],
+})
+export class FeatureModule {}
+```
+
+## Запросы к базе данных
+
+### Простые операции:
+
+#### Поиск:
+
+```typescript
+// По ID
+const entity = await this.repo.findOne({ where: { id } });
+
+// С отношениями
+const entity = await this.repo.findOne({
+  where: { id },
+  relations: ['relatedEntity'],
+});
+
+// Множественный поиск
+const entities = await this.repo.find({
+  where: { field: value },
+  order: { createdAt: 'DESC' },
+});
+```
+
+#### Создание и сохранение:
+
+```typescript
+// Создание новой сущности
+const entity = this.repo.create({
+  field1: value1,
+  field2: value2,
+});
+
+// Сохранение
+await this.repo.save(entity);
+
+// Или в одну строку для обновления существующей
+const entity =
+  (await this.repo.findOne({ where: { id } })) ??
+  this.repo.create({ id, ...data });
+await this.repo.save(entity);
+```
+
+### Query Builder:
+
+#### Сложные запросы:
+
+```typescript
+const qb = this.repo
+  .createQueryBuilder('alias')
+  .leftJoinAndSelect('alias.relation', 'relationAlias');
+
+// Условия
+if (search) {
+  qb.where('alias.field ILIKE :search', { search: `%${search}%` });
+}
+
+if (filter) {
+  qb.andWhere('alias.field = :filter', { filter });
+}
+
+// Для массивов
+if (arrayValue) {
+  qb.andWhere(':value = ANY(alias.arrayField)', { value: arrayValue });
+}
+
+return qb.getMany();
+```
+
+### Правила написания запросов:
+
+- **Используйте параметризованные запросы** для предотвращения SQL-инъекций
+- **Загружайте связи явно** через `relations` или `leftJoinAndSelect`
+- **Используйте Query Builder** для сложных запросов
+- **Добавляйте индексы** для часто используемых полей
+
+## Транзакции
+
+### Использование транзакций:
+
+```typescript
+await this.dataSource.transaction(async (manager) => {
+  const entity1 = await manager.save(Entity1, data1);
+  const entity2 = await manager.save(Entity2, {
+    ...data2,
+    entity1Id: entity1.id,
+  });
+  return { entity1, entity2 };
+});
+```
+
+### Правила:
+
+- Используйте транзакции для **атомарных операций**
+- **Группируйте связанные операции** в одну транзакцию
+- **Обрабатывайте ошибки** транзакций
+
+## Производительность
+
+### Оптимизация запросов:
+
+- **Используйте select** для выборки только нужных полей
+- **Избегайте N+1 проблемы** - загружайте связи заранее
+- **Используйте пагинацию** для больших наборов данных
+- **Создавайте индексы** для часто используемых полей
+
+### Пример оптимизированного запроса:
+
+```typescript
+const entities = await this.repo
+  .createQueryBuilder('entity')
+  .select(['entity.id', 'entity.title', 'entity.createdAt'])
+  .leftJoinAndSelect('entity.relation', 'relation')
+  .where('entity.status = :status', { status: 'active' })
+  .orderBy('entity.createdAt', 'DESC')
+  .limit(20)
+  .offset(page * 20)
+  .getMany();
+```
+
+## Валидация данных
+
+### На уровне сущности:
+
+```typescript
+@Entity()
+export class Feature {
+  @Column({ length: 255 })
+  @IsNotEmpty()
+  @MaxLength(255)
+  title: string;
+
+  @Column({ type: 'integer', unsigned: true })
+  @IsPositive()
+  year: number;
+}
+```
+
+### Правила валидации:
+
+- **Валидируйте на уровне DTO** входящие данные
+- **Используйте ограничения БД** для критичных полей
+- **Проверяйте уникальность** на уровне базы данных
+
+## Резервное копирование и миграции
+
+### Стратегия:
+
+- **Регулярные бэкапы** продакшн базы
+- **Тестирование миграций** на копии продакшн данных
+- **Откат-план** для каждой миграции
+- **Мониторинг** производительности после миграций
+
+### Команды PostgreSQL:
+
+```bash
+# Создание бэкапа
+pg_dump -h host -U user -d database > backup.sql
+
+# Восстановление
+psql -h host -U user -d database < backup.sql
+```

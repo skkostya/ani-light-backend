@@ -1,0 +1,177 @@
+# Архитектурные правила проекта ani-light-backend
+
+## Общая архитектура
+
+Проект построен на **NestJS** с использованием модульной архитектуры и следует принципам:
+
+- **Модульность**: каждая функциональность выделена в отдельный модуль
+- **Dependency Injection**: используется встроенная DI система NestJS
+- **Layered Architecture**: разделение на Controller → Service → Repository слои
+
+## Структура модулей
+
+### Обязательная структура модуля:
+
+```
+modules/
+  feature-name/
+    ├── entities/           # TypeORM сущности
+    │   └── feature.entity.ts
+    ├── dto/               # Data Transfer Objects
+    │   └── feature.dto.ts
+    ├── feature.controller.ts
+    ├── feature.service.ts
+    ├── feature.controller.spec.ts
+    └── feature.service.spec.ts
+```
+
+### Правила именования:
+
+- **Контроллеры**: `FeatureController` с декоратором `@Controller('feature')`
+- **Сервисы**: `FeatureService` с декоратором `@Injectable()`
+- **Сущности**: `Feature` с декоратором `@Entity()`
+- **DTO**: описательные имена с суффиксом `Dto` (например, `GetAnimeListDto`)
+
+## Модульная система
+
+### Основные модули:
+
+1. **AppModule** - корневой модуль с глобальными настройками
+2. **CombineCachedModule** - модуль с кэшированием и HTTP-клиентом
+3. **CombineModule** - базовый модуль без дополнительных зависимостей
+
+### Правила создания модулей:
+
+- Используйте константы для группировки сущностей, сервисов и контроллеров:
+
+```typescript
+const ENTITIES = [Feature];
+const SERVICES = [FeatureService];
+const CONTROLLERS = [FeatureController];
+
+@Module({
+  imports: [TypeOrmModule.forFeature(ENTITIES)],
+  controllers: CONTROLLERS,
+  providers: SERVICES,
+})
+```
+
+## Dependency Injection
+
+### Обязательные практики:
+
+- Все зависимости инжектируются через конструктор
+- Используйте декораторы для специальных инжекций:
+  - `@InjectRepository()` для репозиториев TypeORM
+  - `@Inject(CACHE_MANAGER)` для кэш-менеджера
+  - `@Inject()` для кастомных провайдеров
+
+### Пример правильной инжекции:
+
+```typescript
+@Injectable()
+export class FeatureService {
+  constructor(
+    @InjectRepository(Feature)
+    private featureRepo: Repository<Feature>,
+    private httpService: HttpService,
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
+  ) {}
+}
+```
+
+## Конфигурация
+
+### Глобальная конфигурация:
+
+- `ConfigModule.forRoot({ isGlobal: true })` в AppModule
+- Все переменные окружения доступны через `ConfigService`
+- Используйте `ConfigService` в фабричных функциях для асинхронной конфигурации
+
+### Пример конфигурации:
+
+```typescript
+TypeOrmModule.forRootAsync({
+  imports: [ConfigModule],
+  useFactory: (config: ConfigService) => ({
+    type: 'postgres',
+    host: config.get('POSTGRES_HOST'),
+    // ... другие настройки
+  }),
+  inject: [ConfigService],
+});
+```
+
+## Кэширование
+
+### Стратегия кэширования:
+
+- Используется Redis через `cache-manager-redis-store`
+- TTL по умолчанию: 3600 секунд (1 час)
+- Ключи кэша должны быть описательными: `anime_${id}`, `episodes_${id}`, `search_${query}`
+
+### Правила кэширования:
+
+- Кэшируйте дорогие операции (внешние API, сложные запросы)
+- Всегда проверяйте наличие данных в кэше перед выполнением операции
+- Используйте типизированные методы кэша: `get<Type>()`, `set()`
+
+## HTTP-клиент
+
+### Работа с внешними API:
+
+- Используйте `HttpService` из `@nestjs/axios`
+- Конвертируйте Observable в Promise через `lastValueFrom()`
+- Выносите URL API в переменные окружения
+- Создавайте приватные методы для работы с API (например, `fetchFromApi()`)
+
+### Пример:
+
+```typescript
+private async fetchFromApi(endpoint: string) {
+  const response = await lastValueFrom(
+    this.httpService.get(`${this.baseUrl}${endpoint}`)
+  );
+  return response.data;
+}
+```
+
+## Планировщик задач
+
+### Cron-задачи:
+
+- Используйте декоратор `@Cron()` для периодических задач
+- Синхронизация данных должна происходить в фоновом режиме
+- Обрабатывайте ошибки в cron-задачах
+
+### Пример:
+
+```typescript
+@Cron('0 0 * * *') // каждый день в полночь
+async syncData() {
+  // логика синхронизации
+}
+```
+
+## Обработка ошибок
+
+### Стратегия:
+
+- Используйте встроенные HTTP-исключения NestJS
+- Не выбрасывайте исключения в cron-задачах без обработки
+- Логируйте ошибки для отладки
+
+## Тестирование
+
+### Обязательные тесты:
+
+- Unit-тесты для всех сервисов (`*.service.spec.ts`)
+- Unit-тесты для всех контроллеров (`*.controller.spec.ts`)
+- E2E тесты в папке `test/`
+
+### Конфигурация Jest:
+
+- Тесты находятся в `src/` рядом с исходным кодом
+- Паттерн тестовых файлов: `*.spec.ts`
+- Покрытие кода собирается в папку `coverage/`

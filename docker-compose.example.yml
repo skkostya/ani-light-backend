@@ -1,0 +1,117 @@
+# 🐳 Docker Compose для Ani-Light Backend
+# Скопируйте этот файл в docker-compose.yml и настройте под свои нужды
+
+version: '3.8'
+
+services:
+  # 🗄️ PostgreSQL База данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: ani-light-postgres
+    environment:
+      POSTGRES_DB: ani_light_db
+      POSTGRES_USER: ani_light_user
+      POSTGRES_PASSWORD: your_secure_password
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ani_light_user -d ani_light_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ani-light-network
+
+  # 🔴 Redis для кэширования
+  redis:
+    image: redis:7-alpine
+    container_name: ani-light-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ani-light-network
+
+  # 🎬 Ani-Light Backend (опционально, для полного стека)
+  # Раскомментируйте если хотите запустить backend в Docker
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: ani-light-backend
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - POSTGRES_HOST=postgres
+  #     - REDIS_HOST=redis
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - ani-light-network
+
+  # 📊 Prometheus для метрик (опционально)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: ani-light-prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  #     - prometheus_data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #     - '--web.console.libraries=/etc/prometheus/console_libraries'
+  #     - '--web.console.templates=/etc/prometheus/consoles'
+  #   networks:
+  #     - ani-light-network
+
+  # 📈 Grafana для визуализации (опционально)
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: ani-light-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #   networks:
+  #     - ani-light-network
+
+# 💾 Постоянные тома для данных
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  # prometheus_data:
+  #   driver: local
+  # grafana_data:
+  #   driver: local
+
+# 🌐 Сеть для связи контейнеров
+networks:
+  ani-light-network:
+    driver: bridge

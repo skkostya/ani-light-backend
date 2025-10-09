@@ -1,0 +1,262 @@
+import { HttpService } from '@nestjs/axios';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
+import { HttpRetryService } from '../../common/services/http-retry.service';
+import { Episode } from '../episode/entities/episode.entity';
+import { AnimeService } from './anime.service';
+import { Anime } from './entities/anime.entity';
+
+describe('AnimeService', () => {
+  let service: AnimeService;
+  let animeRepository: jest.Mocked<Repository<Anime>>;
+  let episodeRepository: jest.Mocked<Repository<Episode>>;
+  let cacheManager: jest.Mocked<any>;
+  let httpRetryService: jest.Mocked<HttpRetryService>;
+
+  const mockAnime: Partial<Anime> = {
+    id: '123e4567-e89b-12d3-a456-426614174000',
+    external_id: 1,
+    title_ru: 'Тестовое аниме',
+    title_en: 'Test Anime',
+    description: 'Описание тестового аниме',
+    genres: ['action', 'adventure'],
+    year: 2023,
+    poster_url: 'https://example.com/poster.jpg',
+  };
+
+  const mockEpisode: Partial<Episode> = {
+    id: '123e4567-e89b-12d3-a456-426614174001',
+    number: 1,
+    video_url: 'https://example.com/video.m3u8',
+    subtitles_url: 'https://example.com/subtitles.vtt',
+    anime_id: mockAnime.id!,
+  };
+
+  beforeEach(async () => {
+    const mockRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      createQueryBuilder: jest.fn(),
+    };
+
+    const mockQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getCount: jest.fn(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+    };
+
+    mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AnimeService,
+        {
+          provide: getRepositoryToken(Anime),
+          useValue: mockRepository,
+        },
+        {
+          provide: getRepositoryToken(Episode),
+          useValue: mockRepository,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+          },
+        },
+        {
+          provide: HttpRetryService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+        {
+          provide: HttpService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<AnimeService>(AnimeService);
+    animeRepository = module.get(getRepositoryToken(Anime));
+    episodeRepository = module.get(getRepositoryToken(Episode));
+    cacheManager = module.get(CACHE_MANAGER);
+    httpRetryService = module.get(HttpRetryService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('getAnimeList', () => {
+    it('should return paginated anime list', async () => {
+      const query = { page: 1, limit: 20 };
+      const mockAnimeList = [mockAnime];
+      const totalCount = 1;
+
+      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      mockQueryBuilder.getCount = jest.fn().mockResolvedValue(totalCount);
+      mockQueryBuilder.getMany = jest.fn().mockResolvedValue(mockAnimeList);
+
+      const result = await service.getAnimeList(query);
+
+      expect(result).toBeInstanceOf(PaginatedResponseDto);
+      expect(result.data).toEqual(mockAnimeList);
+      expect(result.total).toBe(totalCount);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+    });
+
+    it('should apply search filter', async () => {
+      const query = { search: 'test', page: 1, limit: 20 };
+      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      mockQueryBuilder.getCount = jest.fn().mockResolvedValue(0);
+      mockQueryBuilder.getMany = jest.fn().mockResolvedValue([]);
+
+      await service.getAnimeList(query);
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'anime.title_ru ILIKE :search OR anime.title_en ILIKE :search',
+        { search: '%test%' },
+      );
+    });
+
+    it('should apply genre filter', async () => {
+      const query = { genre: 'action', page: 1, limit: 20 };
+      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      mockQueryBuilder.getCount = jest.fn().mockResolvedValue(0);
+      mockQueryBuilder.getMany = jest.fn().mockResolvedValue([]);
+
+      await service.getAnimeList(query);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        ':genre = ANY(anime.genres)',
+        { genre: 'action' },
+      );
+    });
+
+    it('should apply year filter', async () => {
+      const query = { year: 2023, page: 1, limit: 20 };
+      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      mockQueryBuilder.getCount = jest.fn().mockResolvedValue(0);
+      mockQueryBuilder.getMany = jest.fn().mockResolvedValue([]);
+
+      await service.getAnimeList(query);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'anime.year = :year',
+        { year: 2023 },
+      );
+    });
+  });
+
+  describe('getAnimeDetails', () => {
+    it('should return anime from cache if available', async () => {
+      const animeId = mockAnime.id!;
+      cacheManager.get.mockResolvedValue(mockAnime);
+
+      const result = await service.getAnimeDetails(animeId);
+
+      expect(result).toEqual(mockAnime);
+      expect(cacheManager.get).toHaveBeenCalledWith(`anime_${animeId}`);
+      expect(animeRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should fetch anime from database if not in cache', async () => {
+      const animeId = mockAnime.id!;
+      cacheManager.get.mockResolvedValue(null);
+      animeRepository.findOne.mockResolvedValue(mockAnime as Anime);
+
+      const result = await service.getAnimeDetails(animeId);
+
+      expect(result).toEqual(mockAnime);
+      expect(animeRepository.findOne).toHaveBeenCalledWith({
+        where: { id: animeId },
+        relations: ['episodes'],
+      });
+      expect(cacheManager.set).toHaveBeenCalledWith(
+        `anime_${animeId}`,
+        mockAnime,
+        3600,
+      );
+    });
+  });
+
+  describe('getEpisodes', () => {
+    it('should return episodes from cache if available', async () => {
+      const animeId = mockAnime.id!;
+      const mockEpisodes = [mockEpisode];
+      cacheManager.get.mockResolvedValue(mockEpisodes);
+
+      const result = await service.getEpisodes(animeId);
+
+      expect(result).toEqual(mockEpisodes);
+      expect(cacheManager.get).toHaveBeenCalledWith(`episodes_${animeId}`);
+    });
+
+    it('should fetch episodes from database if not in cache', async () => {
+      const animeId = mockAnime.id!;
+      const mockEpisodes = [mockEpisode];
+      cacheManager.get.mockResolvedValue(null);
+      episodeRepository.find.mockResolvedValue(mockEpisodes as Episode[]);
+
+      const result = await service.getEpisodes(animeId);
+
+      expect(result).toEqual(mockEpisodes);
+      expect(episodeRepository.find).toHaveBeenCalledWith({
+        where: { anime: { id: animeId } },
+        order: { number: 'ASC' },
+      });
+      expect(cacheManager.set).toHaveBeenCalledWith(
+        `episodes_${animeId}`,
+        mockEpisodes,
+        3600,
+      );
+    });
+  });
+
+  describe('searchAnime', () => {
+    it('should return search results from cache if available', async () => {
+      const query = 'test';
+      const mockResults = [mockAnime];
+      cacheManager.get.mockResolvedValue(mockResults);
+
+      const result = await service.searchAnime(query);
+
+      expect(result).toEqual(mockResults);
+      expect(cacheManager.get).toHaveBeenCalledWith(`search_${query}`);
+      expect(httpRetryService.get).not.toHaveBeenCalled();
+    });
+
+    it('should fetch search results from API if not in cache', async () => {
+      const query = 'test';
+      const mockResults = [mockAnime];
+      cacheManager.get.mockResolvedValue(null);
+      httpRetryService.get.mockResolvedValue({ data: mockResults });
+
+      const result = await service.searchAnime(query);
+
+      expect(result).toEqual(mockResults);
+      expect(httpRetryService.get).toHaveBeenCalled();
+      expect(cacheManager.set).toHaveBeenCalledWith(
+        `search_${query}`,
+        mockResults,
+        3600,
+      );
+    });
+  });
+});
