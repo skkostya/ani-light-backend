@@ -2,10 +2,13 @@ import {
   Column,
   Entity,
   JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { AgeRating } from '../../dictionaries/entities/age-rating.entity';
 import { Episode } from '../../episode/entities/episode.entity';
+import { AnimeGenre } from './anime-genre.entity';
 
 // Интерфейсы для типизации связей
 export interface UserAnimeRelation {
@@ -47,14 +50,42 @@ export class Anime {
   @Column('text')
   description: string;
 
-  @Column('text', { array: true })
-  genres: string[];
+  @Column('text', { array: true, nullable: true })
+  genres?: string[]; // Временно оставляем для миграции
+
+  @Column({ nullable: true })
+  age_rating_id?: string;
 
   @Column()
   year: number;
 
   @Column()
   poster_url: string;
+
+  // Новые поля из AniLibria API
+  @Column({ nullable: true })
+  alias?: string;
+
+  @Column({ default: false })
+  is_blocked_by_geo: boolean;
+
+  @Column({ default: false })
+  is_ongoing: boolean;
+
+  @Column('jsonb', { nullable: true })
+  publish_day?: {
+    value: number;
+    description: string;
+  };
+
+  @Column({ nullable: true })
+  episodes_total?: number;
+
+  @Column({ nullable: true })
+  average_duration_of_episode?: number;
+
+  @Column({ nullable: true })
+  external_created_at?: Date;
 
   @OneToMany(() => Episode, (episode) => episode.anime)
   @JoinColumn()
@@ -65,4 +96,12 @@ export class Anime {
 
   @OneToMany('AnimeRating', 'anime')
   ratings: AnimeRatingRelation[];
+
+  // Связи с справочниками
+  @ManyToOne(() => AgeRating, { nullable: true })
+  @JoinColumn({ name: 'age_rating_id' })
+  ageRating?: AgeRating;
+
+  @OneToMany(() => AnimeGenre, (animeGenre) => animeGenre.anime)
+  animeGenres: AnimeGenre[];
 }
