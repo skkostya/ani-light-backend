@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { Anime } from '../anime/entities/anime.entity';
+import { AniLibriaScheduleEpisode } from '../anime/types/anilibria-api.types';
 import { Episode } from './entities/episode.entity';
 
 dotenv.config();
@@ -86,6 +87,46 @@ export class EpisodeService {
       await this.cacheManager.set(cacheKey, episode, 3600);
     }
     return episode;
+  }
+
+  async createEpisodeFromSchedule(
+    anime: Anime,
+    episode: AniLibriaScheduleEpisode,
+  ): Promise<Episode> {
+    // Проверяем, есть ли уже такой эпизод
+    const existingEpisode = await this.episodeRepository.findOne({
+      where: {
+        anime: { id: anime.id },
+        number: episode.ordinal || episode.sort_order,
+      },
+    });
+
+    if (existingEpisode) {
+      return existingEpisode;
+    }
+
+    // Создаем новый эпизод
+    const newEpisode = this.episodeRepository.create({
+      anime: anime,
+      number: episode.ordinal || episode.sort_order,
+      video_url: episode.hls_1080 || episode.hls_720 || episode.hls_480 || '',
+      video_url_480: episode.hls_480 || null,
+      video_url_720: episode.hls_720 || null,
+      video_url_1080: episode.hls_1080 || null,
+      opening: episode.opening || null,
+      ending: episode.ending || null,
+      duration: episode.duration || null,
+      subtitles_url: undefined, // В API расписания нет информации о субтитрах
+    } as Partial<Episode>);
+
+    return await this.episodeRepository.save(newEpisode);
+  }
+
+  async findEpisodesByAnimeId(animeId: string): Promise<Episode[]> {
+    return await this.episodeRepository.find({
+      where: { anime: { id: animeId } },
+      order: { number: 'ASC' },
+    });
   }
 
   private async fetchFromApi(endpoint: string) {

@@ -12,13 +12,13 @@ import { HttpRetryService } from '../../common/services/http-retry.service';
 import { AgeRatingService } from '../dictionaries/services/age-rating.service';
 import { GenreService } from '../dictionaries/services/genre.service';
 import { Episode } from '../episode/entities/episode.entity';
+import { EpisodeService } from '../episode/episode.service';
+import { AnimeGenreService } from './anime-genre.service';
 import { GetAnimeListDto } from './dto/anime.dto';
-import { AnimeGenre } from './entities/anime-genre.entity';
 import { Anime } from './entities/anime.entity';
 import {
   AniLibriaAnime,
   AniLibriaApiResponse,
-  AniLibriaGenre,
   AniLibriaScheduleEpisode,
   AniLibriaScheduleItem,
   AniLibriaScheduleResponse,
@@ -32,12 +32,10 @@ export class AnimeService {
   constructor(
     @InjectRepository(Anime)
     private animeRepo: Repository<Anime>,
-    @InjectRepository(Episode)
-    private episodeRepo: Repository<Episode>,
-    @InjectRepository(AnimeGenre)
-    private animeGenreRepo: Repository<AnimeGenre>,
     private ageRatingService: AgeRatingService,
     private genreService: GenreService,
+    private episodeService: EpisodeService,
+    private animeGenreService: AnimeGenreService,
     private httpService: HttpService,
     private httpRetryService: HttpRetryService,
     @Inject(CACHE_MANAGER)
@@ -67,7 +65,7 @@ export class AnimeService {
 
       // Сначала синхронизируем справочники
       const allReleases = allScheduleItems.map((item) => item.release);
-      await this.syncGenres(allReleases);
+      await this.genreService.syncGenresFromApi(allReleases);
       await this.syncAgeRatings(allReleases);
 
       // Обрабатываем каждый элемент расписания
@@ -89,7 +87,9 @@ export class AnimeService {
 
     try {
       // Обрабатываем жанры и возрастные ограничения
-      const genreIds = await this.processGenres(release.genres || []);
+      const genreIds = await this.genreService.processGenresFromApi(
+        release.genres || [],
+      );
       const ageRatingId = await this.processAgeRating(release.age_rating);
 
       // Ищем существующее аниме
@@ -159,7 +159,7 @@ export class AnimeService {
       await this.animeRepo.save(anime);
 
       // Обновляем связи с жанрами
-      await this.updateAnimeGenres(anime.id, genreIds);
+      await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
 
       // Обрабатываем эпизод из расписания, если он есть
       if (scheduleItem.published_release_episode) {
@@ -178,39 +178,10 @@ export class AnimeService {
     episode: AniLibriaScheduleEpisode,
   ) {
     try {
-      // Проверяем, есть ли уже такой эпизод
-      const existingEpisode = await this.episodeRepo.findOne({
-        where: {
-          anime: { id: anime.id },
-          number: episode.ordinal || episode.sort_order,
-        },
-      });
-
-      if (!existingEpisode) {
-        // Создаем новый эпизод
-        const newEpisode = this.episodeRepo.create({
-          anime: anime,
-          number: episode.ordinal || episode.sort_order,
-          video_url:
-            episode.hls_1080 || episode.hls_720 || episode.hls_480 || '',
-          video_url_480: episode.hls_480 || null,
-          video_url_720: episode.hls_720 || null,
-          video_url_1080: episode.hls_1080 || null,
-          opening: episode.opening || null,
-          ending: episode.ending || null,
-          duration: episode.duration || null,
-          subtitles_url: undefined, // В API расписания нет информации о субтитрах
-        } as Partial<Episode>);
-
-        await this.episodeRepo.save(newEpisode);
-        console.log(
-          `Created new episode ${episode.ordinal || episode.sort_order} for anime ${anime.title_ru}`,
-        );
-      } else {
-        console.log(
-          `Episode ${episode.ordinal || episode.sort_order} already exists for anime ${anime.title_ru}`,
-        );
-      }
+      await this.episodeService.createEpisodeFromSchedule(anime, episode);
+      console.log(
+        `Created/updated episode ${episode.ordinal || episode.sort_order} for anime ${anime.title_ru}`,
+      );
     } catch (error) {
       console.error(`Error processing episode for anime ${anime.id}:`, error);
     }
@@ -355,7 +326,9 @@ export class AnimeService {
 
       if (!existingAnime) {
         // Обрабатываем жанры и возрастные ограничения
-        const genreIds = await this.processGenres(apiAnime.genres || []);
+        const genreIds = await this.genreService.processGenresFromApi(
+          apiAnime.genres || [],
+        );
         const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
 
         // Создаем новое аниме
@@ -388,7 +361,7 @@ export class AnimeService {
         });
 
         await this.animeRepo.save(anime);
-        await this.updateAnimeGenres(anime.id, genreIds);
+        await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
 
         console.log(`Synced new anime from API: ${anime.title_ru}`);
       }
@@ -417,7 +390,9 @@ export class AnimeService {
         );
 
         // Обрабатываем жанры и ограничение по возрасту
-        const genreIds = await this.processGenres(data.genres || []);
+        const genreIds = await this.genreService.processGenresFromApi(
+          data.genres || [],
+        );
         const ageRatingId = await this.processAgeRating(data.age_rating);
 
         anime = this.animeRepo.create({
@@ -448,7 +423,7 @@ export class AnimeService {
         await this.animeRepo.save(anime);
 
         // Создаем связи с жанрами
-        await this.updateAnimeGenres(anime.id, genreIds);
+        await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
       }
       await this.cacheManager.set(cacheKey, anime, 3600);
     }
@@ -459,105 +434,10 @@ export class AnimeService {
     const cacheKey = `episodes_anime_${id}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
     if (!episodes) {
-      episodes = await this.episodeRepo.find({
-        where: { anime: { id } },
-        order: { number: 'ASC' },
-      });
+      episodes = await this.episodeService.findEpisodesByAnimeId(id);
       await this.cacheManager.set(cacheKey, episodes, 3600);
     }
     return episodes;
-  }
-
-  // Методы для работы с жанрами
-  private async syncGenres(titles: AniLibriaAnime[]) {
-    console.log('Syncing genres from API...');
-
-    // Собираем все уникальные жанры из всех аниме
-    const allGenres = new Map<
-      number,
-      {
-        external_id: number;
-        name: string;
-        image: { optimized_preview: string; preview: string };
-      }
-    >();
-    titles.forEach((title) => {
-      if (title.genres && Array.isArray(title.genres)) {
-        title.genres.forEach((genre) => {
-          if (genre.id && genre.name) {
-            allGenres.set(genre.id, {
-              external_id: genre.id,
-              name: genre.name,
-              image: {
-                optimized_preview: genre.image?.optimized?.preview || '',
-                preview: genre.image?.preview || '',
-              },
-            });
-          }
-        });
-      }
-    });
-
-    console.log(`Found ${allGenres.size} unique genres`);
-
-    // Синхронизируем каждый жанр
-    for (const [externalId, genreData] of allGenres) {
-      try {
-        const existingGenre =
-          await this.genreService.findByExternalId(externalId);
-        // Обновляем существующий жанр
-        await this.genreService.update(existingGenre.id, genreData);
-        console.log(`Updated genre: ${genreData.name}`);
-      } catch {
-        // Жанр не найден, создаем новый
-        try {
-          await this.genreService.create(genreData);
-          console.log(`Created new genre: ${genreData.name}`);
-        } catch (createError) {
-          console.error(
-            `Failed to create genre ${genreData.name}:`,
-            createError,
-          );
-        }
-      }
-    }
-  }
-
-  private async processGenres(genres: AniLibriaGenre[]): Promise<string[]> {
-    const genreIds: string[] = [];
-
-    for (const genre of genres) {
-      if (genre.id) {
-        try {
-          const genreEntity = await this.genreService.findByExternalId(
-            genre.id,
-          );
-          genreIds.push(genreEntity.id);
-        } catch (error) {
-          console.error(`Genre with external ID ${genre.id} not found:`, error);
-        }
-      }
-    }
-
-    return genreIds;
-  }
-
-  private async updateAnimeGenres(animeId: string, genreIds: string[]) {
-    // Удаляем существующие связи
-    await this.animeGenreRepo.delete({ anime_id: animeId });
-
-    // Создаем новые связи
-    for (const genreId of genreIds) {
-      const animeGenre = this.animeGenreRepo.create({
-        anime_id: animeId,
-        genre_id: genreId,
-      });
-      await this.animeGenreRepo.save(animeGenre);
-    }
-
-    console.log(
-      `Updated ${genreIds.length} genre associations for anime ${animeId}`,
-    );
   }
 
   // Методы для работы с ограничениями по возрасту
@@ -644,7 +524,9 @@ export class AnimeService {
 
         if (!anime) {
           // Создаем новое аниме
-          const genreIds = await this.processGenres(apiAnime.genres || []);
+          const genreIds = await this.genreService.processGenresFromApi(
+            apiAnime.genres || [],
+          );
           const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
 
           anime = this.animeRepo.create({
@@ -677,7 +559,7 @@ export class AnimeService {
           await this.animeRepo.save(anime);
 
           // Создаем связи с жанрами
-          await this.updateAnimeGenres(anime.id, genreIds);
+          await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
         }
 
         animeList.push(anime);
