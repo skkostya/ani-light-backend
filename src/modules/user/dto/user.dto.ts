@@ -1,24 +1,36 @@
-import {
-  IsEmail,
-  IsEnum,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsStrongPassword } from '../../../common/validators/password-strength.validator';
 import { AuthType, SubscriptionType } from '../entities/user.entity';
 
 export class CreateUserDto {
+  @ApiProperty({
+    description: 'Email адрес пользователя',
+    example: 'user@example.com',
+    format: 'email',
+  })
   @IsEmail({}, { message: 'Некорректный email адрес' })
   email: string;
 
+  @ApiProperty({
+    description: 'Имя пользователя',
+    example: 'username',
+    minLength: 3,
+  })
   @IsString()
   @MinLength(3, {
     message: 'Имя пользователя должно содержать минимум 3 символа',
   })
   username: string;
 
+  @ApiProperty({
+    description:
+      'Пароль пользователя (минимум 8 символов, включая заглавные и строчные буквы, цифры и специальные символы)',
+    example: 'Password123!',
+    minLength: 8,
+  })
   @IsString()
-  @MinLength(6, { message: 'Пароль должен содержать минимум 6 символов' })
+  @IsStrongPassword()
   password: string;
 }
 
@@ -46,9 +58,18 @@ export class CreateTelegramUserDto {
 }
 
 export class LoginDto {
+  @ApiProperty({
+    description: 'Email адрес пользователя',
+    example: 'user@example.com',
+    format: 'email',
+  })
   @IsEmail({}, { message: 'Некорректный email адрес' })
   email: string;
 
+  @ApiProperty({
+    description: 'Пароль пользователя',
+    example: 'password123',
+  })
   @IsString()
   password: string;
 }

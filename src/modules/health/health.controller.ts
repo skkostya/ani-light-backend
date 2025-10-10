@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   DiskHealthIndicator,
   HealthCheck,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 
+@ApiTags('health')
 @Controller('health')
 @SkipThrottle() // Исключаем health checks из rate limiting
 export class HealthController {
@@ -23,6 +25,45 @@ export class HealthController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Общая проверка здоровья системы',
+    description: 'Проверяет состояние базы данных, памяти и диска',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Система работает нормально',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ok' },
+        info: {
+          type: 'object',
+          properties: {
+            database: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+            memory_heap: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+            memory_rss: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+            storage: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Один или несколько компонентов недоступны',
+  })
   @HealthCheck()
   check() {
     return this.health.check([

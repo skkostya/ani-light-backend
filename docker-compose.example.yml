@@ -46,29 +46,43 @@ services:
     networks:
       - ani-light-network
 
-  # 🎬 Ani-Light Backend (опционально, для полного стека)
-  # Раскомментируйте если хотите запустить backend в Docker
-  # backend:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: ani-light-backend
-  #   ports:
-  #     - "3001:3001"
-  #   environment:
-  #     - NODE_ENV=production
-  #     - POSTGRES_HOST=postgres
-  #     - REDIS_HOST=redis
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #   networks:
-  #     - ani-light-network
+  # 🎬 Ani-Light Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ani-light-backend
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=ani_light_user
+      - POSTGRES_PASSWORD=your_secure_password
+      - POSTGRES_DB=ani_light_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - ANILIBRIA_API_URL=https://anilibria.top/api/v1
+      - FRONTEND_URL=http://localhost:3000
+      - LOG_LEVEL=warn
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ani-light-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/health/live']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # 📊 Prometheus для метрик (опционально)
   # prometheus:

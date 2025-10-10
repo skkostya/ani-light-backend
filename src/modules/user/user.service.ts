@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import { Repository } from 'typeorm';
+import { SecurityAuditService } from '../../common/services/security-audit.service';
 import { UpdateUserNotificationsDto } from './dto/user-notifications.dto';
 import {
   CreateTelegramUserDto,
@@ -23,6 +24,7 @@ export class UserService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
+    private securityAuditService: SecurityAuditService,
   ) {}
 
   async register(

@@ -8,6 +8,7 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { envValidationSchema } from './common/config/env.validation';
 import { winstonConfig } from './common/config/winston.config';
 import { CombineCachedModule } from './modules/combine-cached.module';
 import { CombineModule } from './modules/combine.module';
@@ -17,7 +18,14 @@ import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: envValidationSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: true,
+      },
+    }),
 
     // Логирование
     WinstonModule.forRoot(winstonConfig),

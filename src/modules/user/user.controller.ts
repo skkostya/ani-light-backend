@@ -7,17 +7,53 @@ import {
   Response,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response as ExpressResponse } from 'express';
 import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
 import { CreateTelegramUserDto, CreateUserDto, LoginDto } from './dto/user.dto';
 import { UserService } from './user.service';
 
+@ApiTags('auth')
 @Controller('auth')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('register')
+  @ApiOperation({
+    summary: 'Регистрация нового пользователя',
+    description: 'Создает новый аккаунт пользователя с email и паролем',
+  })
+  @ApiBody({ type: CreateUserDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Пользователь успешно зарегистрирован',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'uuid' },
+            email: { type: 'string', example: 'user@example.com' },
+            username: { type: 'string', example: 'username' },
+            subscription_type: {
+              type: 'string',
+              enum: ['FREE', 'PREMIUM', 'VIP'],
+            },
+            auth_type: { type: 'string', enum: ['EMAIL', 'TELEGRAM'] },
+            created_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        access_token: { type: 'string', example: 'jwt-token' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Пользователь с таким email уже существует',
+  })
+  @ApiResponse({ status: 400, description: 'Ошибка валидации данных' })
   @Throttle({ short: { limit: 1, ttl: 5000 } }) // Более строгий лимит для регистрации
   async register(
     @Body() createUserDto: CreateUserDto,
@@ -35,6 +71,37 @@ export class UserController {
   }
 
   @Post('login')
+  @ApiOperation({
+    summary: 'Вход в систему',
+    description: 'Аутентификация пользователя по email и паролю',
+  })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Вход выполнен успешно',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'uuid' },
+            email: { type: 'string', example: 'user@example.com' },
+            username: { type: 'string', example: 'username' },
+            subscription_type: {
+              type: 'string',
+              enum: ['FREE', 'PREMIUM', 'VIP'],
+            },
+            auth_type: { type: 'string', enum: ['EMAIL', 'TELEGRAM'] },
+            created_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        message: { type: 'string', example: 'Вход выполнен успешно' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Неверные учетные данные' })
+  @ApiResponse({ status: 400, description: 'Ошибка валидации данных' })
   @Throttle({ short: { limit: 2, ttl: 5000 } }) // Более строгий лимит для входа
   async login(@Body() loginDto: LoginDto, @Response() res: ExpressResponse) {
     const result = await this.userService.login(loginDto);
@@ -49,6 +116,51 @@ export class UserController {
   }
 
   @Get('profile')
+  @ApiOperation({
+    summary: 'Получить профиль пользователя',
+    description:
+      'Возвращает информацию о текущем пользователе или статус аутентификации',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Информация о пользователе получена',
+    schema: {
+      oneOf: [
+        {
+          type: 'object',
+          properties: {
+            authenticated: { type: 'boolean', example: true },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', example: 'uuid' },
+                email: { type: 'string', example: 'user@example.com' },
+                username: { type: 'string', example: 'username' },
+                subscription_type: {
+                  type: 'string',
+                  enum: ['FREE', 'PREMIUM', 'VIP'],
+                },
+                auth_type: { type: 'string', enum: ['EMAIL', 'TELEGRAM'] },
+                created_at: { type: 'string', format: 'date-time' },
+              },
+            },
+            shouldHideAds: { type: 'boolean', example: true },
+          },
+        },
+        {
+          type: 'object',
+          properties: {
+            authenticated: { type: 'boolean', example: false },
+            message: {
+              type: 'string',
+              example: 'Пользователь не аутентифицирован',
+            },
+            shouldHideAds: { type: 'boolean', example: false },
+          },
+        },
+      ],
+    },
+  })
   @UseGuards(OptionalJwtGuard)
   getProfile(@Request() req: any) {
     // Если пользователь не аутентифицирован, возвращаем информацию об этом

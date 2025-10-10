@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -70,6 +71,75 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type,Authorization',
   }); // CORS для фронта с поддержкой cookies
 
+  // Swagger документация
+  const config = new DocumentBuilder()
+    .setTitle('Ani-Light Backend API')
+    .setDescription(
+      'API для аниме стриминг платформы с аутентификацией, кэшированием и интеграцией с AniLibria',
+    )
+    .setVersion('1.0.0')
+    .addTag('auth', 'Аутентификация и авторизация')
+    .addTag('anime', 'Управление аниме контентом')
+    .addTag('episodes', 'Управление эпизодами')
+    .addTag('users', 'Управление пользователями')
+    .addTag('health', 'Мониторинг и health checks')
+    .addTag('metrics', 'Метрики Prometheus')
+    .addTag('dictionaries', 'Справочники (жанры, возрастные рейтинги)')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Введите JWT токен',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .addCookieAuth('access_token', {
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'access_token',
+      description: 'JWT токен в httpOnly cookie',
+    })
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+    customSiteTitle: 'Ani-Light API Documentation',
+    customfavIcon: '/favicon.ico',
+    customCss: '.swagger-ui .topbar { display: none }',
+  });
+
   await app.listen(process.env.PORT ?? 3001);
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    await app.close();
+    process.exit(0);
+  });
+
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    await app.close();
+    process.exit(0);
+  });
+
+  // Обработка необработанных исключений
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+  });
 }
 void bootstrap();
