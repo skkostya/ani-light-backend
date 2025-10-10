@@ -1352,6 +1352,11 @@
   dependencies:
     "@babel/types" "^7.28.2"
 
+"@types/bad-words@^3.0.3":
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/@types/bad-words/-/bad-words-3.0.3.tgz#fcda6626a916d8de76f605f64e33a3c6162b6f57"
+  integrity sha512-jYdpTxDOJ+EENnsCwt8cOZhV/+4+qcwhks1igrOSg4zwwA17rsPqLsZpTo1l+OwViNu+5SPus0v5g7iGx+ofzA==
+
 "@types/body-parser@*":
   version "1.19.6"
   resolved "https://registry.npmjs.org/@types/body-parser/-/body-parser-1.19.6.tgz"
@@ -5036,6 +5041,11 @@ pretty-format@30.0.5, pretty-format@^30.0.0:
     "@jest/schemas" "30.0.5"
     ansi-styles "^5.2.0"
     react-is "^18.3.1"
+
+profanity-check@^0.0.3:
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/profanity-check/-/profanity-check-0.0.3.tgz#3302e097b2eabebcaac46f751c4b110ecf1b94d4"
+  integrity sha512-WeghF2hl1eO/Y6hnfiL8NAsdLbeh2ZrWccb5N+JuUjRzBC3CAIAkCBdJXwOg9ICOCdwzhq61aGnev7eUhJcnzg==
 
 prom-client@^15.1.3:
   version "15.1.3"

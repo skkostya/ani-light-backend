@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import { Repository } from 'typeorm';
+import { UpdateUserNotificationsDto } from './dto/user-notifications.dto';
 import {
   CreateTelegramUserDto,
   CreateUserDto,
@@ -177,6 +178,19 @@ export class UserService {
 
   async validateUser(payload: JwtPayloadDto): Promise<User | null> {
     return this.findById(payload.sub);
+  }
+
+  async updateNotifications(
+    userId: string,
+    updateDto: UpdateUserNotificationsDto,
+  ): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Пользователь не найден');
+    }
+
+    Object.assign(user, updateDto);
+    return this.userRepository.save(user);
   }
 
   private toUserResponse(user: User): UserResponseDto {

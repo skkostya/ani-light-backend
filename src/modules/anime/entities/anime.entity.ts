@@ -7,6 +7,29 @@ import {
 } from 'typeorm';
 import { Episode } from '../../episode/entities/episode.entity';
 
+// Интерфейсы для типизации связей
+export interface UserAnimeRelation {
+  id: string;
+  user_id: string;
+  anime_id: string;
+  is_favorite: boolean;
+  want_to_watch: boolean;
+  notifications_telegram: boolean;
+  notifications_email: boolean;
+  rating?: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AnimeRatingRelation {
+  id: string;
+  user_id: string;
+  anime_id: string;
+  rating: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
 @Entity()
 export class Anime {
   @PrimaryGeneratedColumn('uuid')
@@ -36,4 +59,10 @@ export class Anime {
   @OneToMany(() => Episode, (episode) => episode.anime)
   @JoinColumn()
   episodes: Episode[];
+
+  @OneToMany('UserAnime', 'anime')
+  userAnime: UserAnimeRelation[];
+
+  @OneToMany('AnimeRating', 'anime')
+  ratings: AnimeRatingRelation[];
 }
