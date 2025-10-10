@@ -18,8 +18,10 @@ import { Anime } from './entities/anime.entity';
 import {
   AniLibriaAnime,
   AniLibriaApiResponse,
-  AniLibriaEpisodeResponse,
   AniLibriaGenre,
+  AniLibriaScheduleEpisode,
+  AniLibriaScheduleItem,
+  AniLibriaScheduleResponse,
 } from './types/anilibria-api.types';
 
 dotenv.config();
@@ -42,144 +44,234 @@ export class AnimeService {
     private cacheManager: Cache,
   ) {}
 
-  @Cron('0 0 * * *')
-  async syncAnimeData() {
-    const response = await this.fetchFromApi<
-      AniLibriaApiResponse<AniLibriaAnime>
-    >('/anime/catalog/releases');
-    console.log('API Response structure:', Object.keys(response));
+  @Cron('0 9,21 * * *') // 9:00 и 21:00 каждый день
+  async syncScheduleData() {
+    try {
+      console.log('Starting schedule synchronization...');
 
-    // API возвращает { data: [...], meta: {...} }
-    const titles = response.data || [];
-    console.log(`Processing ${titles.length} titles`);
+      const scheduleResponse =
+        await this.fetchFromApi<AniLibriaScheduleResponse>(
+          '/anime/schedule/now',
+        );
 
-    // Сначала синхронизируем все жанры и ограничения по возрасту
-    await this.syncGenres(titles);
-    await this.syncAgeRatings(titles);
+      console.log('Schedule API Response received');
 
-    for (const title of titles) {
-      console.log('Processing title:', title.id, title.name?.main || 'No name');
+      // Объединяем все релизы из расписания
+      const allScheduleItems = [
+        ...(scheduleResponse.today || []),
+        ...(scheduleResponse.yesterday || []),
+        ...(scheduleResponse.tomorrow || []),
+      ];
 
-      // Обрабатываем жанры - получаем ID жанров из справочника
-      const genreIds = await this.processGenres(title.genres || []);
-      console.log('Genre IDs:', genreIds);
+      console.log(`Processing ${allScheduleItems.length} scheduled releases`);
 
-      // Обрабатываем ограничение по возрасту
-      const ageRatingId = await this.processAgeRating(title.age_rating);
-      console.log('Age Rating ID:', ageRatingId);
+      // Сначала синхронизируем справочники
+      const allReleases = allScheduleItems.map((item) => item.release);
+      await this.syncGenres(allReleases);
+      await this.syncAgeRatings(allReleases);
 
+      // Обрабатываем каждый элемент расписания
+      for (const scheduleItem of allScheduleItems) {
+        await this.processScheduleItem(scheduleItem);
+      }
+
+      console.log('Schedule synchronization completed successfully');
+    } catch (error) {
+      console.error('Error during schedule synchronization:', error);
+    }
+  }
+
+  private async processScheduleItem(scheduleItem: AniLibriaScheduleItem) {
+    const release = scheduleItem.release;
+    console.log(
+      `Processing schedule item: ${release.id} - ${release.name?.main || 'No name'}`,
+    );
+
+    try {
+      // Обрабатываем жанры и возрастные ограничения
+      const genreIds = await this.processGenres(release.genres || []);
+      const ageRatingId = await this.processAgeRating(release.age_rating);
+
+      // Ищем существующее аниме
       let anime = await this.animeRepo.findOne({
-        where: { external_id: title.id },
+        where: { external_id: release.id },
         relations: ['animeGenres', 'animeGenres.genre'],
       });
 
       if (!anime) {
+        // Создаем новое аниме
         anime = this.animeRepo.create({
-          external_id: title.id,
-          title_ru: title.name?.main || '',
-          title_en: title.name?.english || '',
-          description: title.description || '',
-          year: title.year || new Date().getFullYear(),
+          external_id: release.id,
+          title_ru: release.name?.main || '',
+          title_en: release.name?.english || '',
+          description: release.description || '',
+          year: release.year || new Date().getFullYear(),
           poster_url:
-            title.poster?.optimized?.preview || title.poster?.preview || '',
-          // Новые поля из AniLibria API
-          alias: title.alias,
-          is_blocked_by_geo: title.is_blocked_by_geo || false,
-          is_ongoing: title.is_ongoing || false,
-          publish_day: title.publish_day
+            release.poster?.optimized?.preview || release.poster?.preview || '',
+          alias: release.alias,
+          is_blocked_by_geo: release.is_blocked_by_geo || false,
+          is_ongoing: release.is_ongoing,
+          publish_day: release.publish_day
             ? {
-                value: title.publish_day.value,
-                description: title.publish_day.description,
+                value: release.publish_day.value,
+                description: release.publish_day.description,
               }
             : undefined,
-          episodes_total: title.episodes_total || undefined,
+          episodes_total: release.episodes_total || undefined,
           average_duration_of_episode:
-            title.average_duration_of_episode || undefined,
-          external_created_at: title.created_at
-            ? new Date(title.created_at)
+            release.average_duration_of_episode || undefined,
+          external_created_at: release.created_at
+            ? new Date(release.created_at)
             : undefined,
           age_rating_id: ageRatingId,
         });
+        console.log(`Created new anime: ${anime.title_ru}`);
       } else {
-        // Обновляем все поля, включая новые
-        anime.title_ru = title.name?.main || '';
-        anime.title_en = title.name?.english || '';
-        anime.description = title.description || '';
-        anime.year = title.year || new Date().getFullYear();
+        // Обновляем существующее аниме
+        anime.title_ru = release.name?.main || '';
+        anime.title_en = release.name?.english || '';
+        anime.description = release.description || '';
+        anime.year = release.year || new Date().getFullYear();
         anime.poster_url =
-          title.poster?.optimized?.preview || title.poster?.preview || '';
-
-        // Новые поля из AniLibria API
-        anime.alias = title.alias;
-        anime.is_blocked_by_geo = title.is_blocked_by_geo || false;
-        anime.is_ongoing = title.is_ongoing || false;
-        anime.publish_day = title.publish_day
+          release.poster?.optimized?.preview || release.poster?.preview || '';
+        anime.alias = release.alias;
+        anime.is_blocked_by_geo = release.is_blocked_by_geo || false;
+        anime.is_ongoing = release.is_ongoing;
+        anime.publish_day = release.publish_day
           ? {
-              value: title.publish_day.value,
-              description: title.publish_day.description,
+              value: release.publish_day.value,
+              description: release.publish_day.description,
             }
           : undefined;
-        anime.episodes_total = title.episodes_total || undefined;
+        anime.episodes_total = release.episodes_total || undefined;
         anime.average_duration_of_episode =
-          title.average_duration_of_episode || undefined;
-        anime.external_created_at = title.created_at
-          ? new Date(title.created_at)
+          release.average_duration_of_episode || undefined;
+        anime.external_created_at = release.created_at
+          ? new Date(release.created_at)
           : undefined;
         anime.age_rating_id = ageRatingId;
+        console.log(
+          `Updated existing anime: ${anime.title_ru}, is_ongoing: ${anime.is_ongoing}`,
+        );
       }
 
-      console.log('Created/Updated anime entity:', anime);
+      // Сохраняем аниме
       await this.animeRepo.save(anime);
 
       // Обновляем связи с жанрами
       await this.updateAnimeGenres(anime.id, genreIds);
-      console.log('Saved anime to database');
 
-      // Получаем эпизоды отдельным запросом
-      try {
-        const episodeResponse =
-          await this.fetchFromApi<AniLibriaEpisodeResponse>(
-            `/anime/releases/${title.id}`,
-          );
-        console.log(
-          'Episode response structure:',
-          Object.keys(episodeResponse),
+      // Обрабатываем эпизод из расписания, если он есть
+      if (scheduleItem.published_release_episode) {
+        await this.processScheduleEpisode(
+          anime,
+          scheduleItem.published_release_episode,
         );
-
-        if (
-          episodeResponse.episodes &&
-          Array.isArray(episodeResponse.episodes)
-        ) {
-          console.log(
-            `Processing ${episodeResponse.episodes.length} episodes for anime ${title.id}`,
-          );
-
-          for (const ep of episodeResponse.episodes) {
-            const episode =
-              (await this.episodeRepo.findOne({
-                where: {
-                  anime: { id: anime.id },
-                  number: ep.ordinal || ep.sort_order,
-                },
-              })) ??
-              this.episodeRepo.create({
-                anime,
-                number: ep.ordinal || ep.sort_order,
-                video_url: ep.hls_1080 || ep.hls_720 || ep.hls_480 || '',
-                subtitles_url: undefined, // В API нет информации о субтитрах
-              });
-
-            console.log('Created episode entity:', episode);
-            await this.episodeRepo.save(episode);
-          }
-        }
-      } catch (error) {
-        console.error(`Error fetching episodes for anime ${title.id}:`, error);
       }
+    } catch (error) {
+      console.error(`Error processing schedule item ${release.id}:`, error);
+    }
+  }
+
+  private async processScheduleEpisode(
+    anime: Anime,
+    episode: AniLibriaScheduleEpisode,
+  ) {
+    try {
+      // Проверяем, есть ли уже такой эпизод
+      const existingEpisode = await this.episodeRepo.findOne({
+        where: {
+          anime: { id: anime.id },
+          number: episode.ordinal || episode.sort_order,
+        },
+      });
+
+      if (!existingEpisode) {
+        // Создаем новый эпизод
+        const newEpisode = this.episodeRepo.create({
+          anime: anime,
+          number: episode.ordinal || episode.sort_order,
+          video_url:
+            episode.hls_1080 || episode.hls_720 || episode.hls_480 || '',
+          video_url_480: episode.hls_480 || null,
+          video_url_720: episode.hls_720 || null,
+          video_url_1080: episode.hls_1080 || null,
+          opening: episode.opening || null,
+          ending: episode.ending || null,
+          duration: episode.duration || null,
+          subtitles_url: undefined, // В API расписания нет информации о субтитрах
+        } as Partial<Episode>);
+
+        await this.episodeRepo.save(newEpisode);
+        console.log(
+          `Created new episode ${episode.ordinal || episode.sort_order} for anime ${anime.title_ru}`,
+        );
+      } else {
+        console.log(
+          `Episode ${episode.ordinal || episode.sort_order} already exists for anime ${anime.title_ru}`,
+        );
+      }
+    } catch (error) {
+      console.error(`Error processing episode for anime ${anime.id}:`, error);
     }
   }
 
   async getAnimeList(
+    query: GetAnimeListDto,
+  ): Promise<PaginatedResponseDto<Anime>> {
+    const { search, genre, year, limit = 20 } = query;
+
+    // Проверяем кэш
+    const cacheKey = `anime_list_${JSON.stringify(query)}`;
+    const cachedResult =
+      await this.cacheManager.get<PaginatedResponseDto<Anime>>(cacheKey);
+    if (cachedResult) {
+      console.log('Returning cached anime list');
+      return cachedResult;
+    }
+
+    // Сначала ищем в локальной базе данных
+    const localResults = await this.searchInLocalDatabase(query);
+
+    // Если результатов недостаточно, дополняем из API
+    if (localResults.data.length < limit && (search || (!genre && !year))) {
+      console.log(
+        `Local database has ${localResults.data.length} results, need ${limit}. Fetching from API...`,
+      );
+
+      try {
+        const apiResults = await this.searchInApi(
+          query,
+          limit - localResults.data.length,
+        );
+
+        // Сохраняем новые аниме в базу данных
+        for (const apiAnime of apiResults) {
+          await this.syncSingleAnimeFromApi(apiAnime);
+        }
+
+        // Повторно ищем в базе данных с обновленными данными
+        const updatedResults = await this.searchInLocalDatabase(query);
+
+        // Кэшируем результат
+        await this.cacheManager.set(cacheKey, updatedResults, 3600); // 1 час
+
+        return updatedResults;
+      } catch (error) {
+        console.error('Error fetching from API:', error);
+        // Возвращаем то, что есть в локальной базе
+        await this.cacheManager.set(cacheKey, localResults, 300); // 5 минут
+        return localResults;
+      }
+    }
+
+    // Кэшируем результат
+    await this.cacheManager.set(cacheKey, localResults, 3600); // 1 час
+
+    return localResults;
+  }
+
+  private async searchInLocalDatabase(
     query: GetAnimeListDto,
   ): Promise<PaginatedResponseDto<Anime>> {
     const { search, genre, year, page = 1, limit = 20 } = query;
@@ -216,6 +308,93 @@ export class AnimeService {
     const data = await qb.getMany();
 
     return new PaginatedResponseDto(data, total, page, limit);
+  }
+
+  private async searchInApi(
+    query: GetAnimeListDto,
+    limit: number,
+  ): Promise<AniLibriaAnime[]> {
+    try {
+      // Формируем параметры запроса к API
+      const apiParams = new URLSearchParams();
+      apiParams.append('limit', limit.toString());
+
+      if (query.search) {
+        apiParams.append('search', query.search);
+      }
+      if (query.genre) {
+        // Здесь нужно будет найти ID жанра по названию
+        const genreEntity = await this.genreService.findByName(query.genre);
+        if (genreEntity) {
+          apiParams.append('f[genres]', genreEntity.external_id.toString());
+        }
+      }
+      if (query.year) {
+        apiParams.append('f[years]', query.year.toString());
+      }
+
+      const apiResponse = await this.fetchFromApi<
+        AniLibriaApiResponse<AniLibriaAnime>
+      >(`/anime/catalog/releases?${apiParams.toString()}`);
+
+      return apiResponse.data || [];
+    } catch (error) {
+      console.error('Error searching in API:', error);
+      return [];
+    }
+  }
+
+  private async syncSingleAnimeFromApi(
+    apiAnime: AniLibriaAnime,
+  ): Promise<void> {
+    try {
+      // Проверяем, есть ли уже такое аниме
+      const existingAnime = await this.animeRepo.findOne({
+        where: { external_id: apiAnime.id },
+      });
+
+      if (!existingAnime) {
+        // Обрабатываем жанры и возрастные ограничения
+        const genreIds = await this.processGenres(apiAnime.genres || []);
+        const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
+
+        // Создаем новое аниме
+        const anime = this.animeRepo.create({
+          external_id: apiAnime.id,
+          title_ru: apiAnime.name?.main || '',
+          title_en: apiAnime.name?.english || '',
+          description: apiAnime.description || '',
+          year: apiAnime.year || new Date().getFullYear(),
+          poster_url:
+            apiAnime.poster?.optimized?.preview ||
+            apiAnime.poster?.preview ||
+            '',
+          alias: apiAnime.alias,
+          is_blocked_by_geo: apiAnime.is_blocked_by_geo || false,
+          is_ongoing: apiAnime.is_ongoing || false,
+          publish_day: apiAnime.publish_day
+            ? {
+                value: apiAnime.publish_day.value,
+                description: apiAnime.publish_day.description,
+              }
+            : undefined,
+          episodes_total: apiAnime.episodes_total || undefined,
+          average_duration_of_episode:
+            apiAnime.average_duration_of_episode || undefined,
+          external_created_at: apiAnime.created_at
+            ? new Date(apiAnime.created_at)
+            : undefined,
+          age_rating_id: ageRatingId,
+        });
+
+        await this.animeRepo.save(anime);
+        await this.updateAnimeGenres(anime.id, genreIds);
+
+        console.log(`Synced new anime from API: ${anime.title_ru}`);
+      }
+    } catch (error) {
+      console.error(`Error syncing anime ${apiAnime.id} from API:`, error);
+    }
   }
 
   async getAnimeDetails(id: string) {
@@ -277,7 +456,7 @@ export class AnimeService {
   }
 
   async getEpisodes(id: string) {
-    const cacheKey = `episodes_${id}`;
+    const cacheKey = `episodes_anime_${id}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
     if (!episodes) {
       episodes = await this.episodeRepo.find({

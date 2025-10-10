@@ -56,4 +56,10 @@ export class GenreService {
   async findByIds(ids: string[]): Promise<Genre[]> {
     return this.genreRepository.findByIds(ids);
   }
+
+  async findByName(name: string): Promise<Genre | null> {
+    return this.genreRepository.findOne({
+      where: { name: name },
+    });
+  }
 }

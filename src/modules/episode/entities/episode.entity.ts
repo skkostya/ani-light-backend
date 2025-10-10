@@ -60,6 +60,33 @@ export class Episode {
   @Column({ nullable: true })
   subtitles_url?: string;
 
+  // Новые поля для качества видео
+  @Column({ nullable: true })
+  video_url_480?: string;
+
+  @Column({ nullable: true })
+  video_url_720?: string;
+
+  @Column({ nullable: true })
+  video_url_1080?: string;
+
+  // Поля для времени opening и ending
+  @Column('json', { nullable: true })
+  opening?: {
+    start: number;
+    stop: number;
+  };
+
+  @Column('json', { nullable: true })
+  ending?: {
+    start: number;
+    stop: number;
+  };
+
+  // Продолжительность эпизода в секундах
+  @Column({ nullable: true })
+  duration?: number;
+
   @Column('uuid')
   anime_id: string;
 

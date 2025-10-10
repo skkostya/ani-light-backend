@@ -89,3 +89,49 @@ export interface AniLibriaEpisode {
 export interface AniLibriaEpisodeResponse {
   episodes: AniLibriaEpisode[];
 }
+
+// Типы для API расписания
+export interface AniLibriaScheduleResponse {
+  today: AniLibriaScheduleItem[];
+  yesterday: AniLibriaScheduleItem[];
+  tomorrow?: AniLibriaScheduleItem[];
+}
+
+export interface AniLibriaScheduleItem {
+  release: AniLibriaAnime;
+  full_season_is_released: boolean;
+  published_release_episode: AniLibriaScheduleEpisode | null;
+  next_release_episode_number?: number;
+}
+
+export interface AniLibriaScheduleEpisode {
+  id: string;
+  name: string;
+  ordinal: number;
+  ending: {
+    start: number;
+    stop: number;
+  };
+  opening: {
+    start: number;
+    stop: number;
+  };
+  preview: {
+    preview: string;
+    thumbnail: string;
+    optimized: {
+      preview: string;
+      thumbnail: string;
+    };
+  };
+  hls_480: string | null;
+  hls_720: string | null;
+  hls_1080: string | null;
+  duration: number;
+  rutube_id: string | null;
+  youtube_id: string | null;
+  updated_at: string;
+  sort_order: number;
+  release_id: number;
+  name_english: string | null;
+}

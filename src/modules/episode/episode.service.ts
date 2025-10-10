@@ -2,11 +2,9 @@ import { HttpService } from '@nestjs/axios';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import * as dotenv from 'dotenv';
-// import { lastValueFrom } from 'rxjs'; // Не используется с HttpRetryService
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { HttpRetryService } from '../../common/services/http-retry.service';
@@ -31,38 +29,6 @@ export class EpisodeService {
     private cacheManager: Cache,
   ) {}
 
-  @Cron('0 0 * * *') // Ежедневно в полночь
-  async syncEpisodesData() {
-    const animes = await this.animeRepository.find();
-    for (const anime of animes) {
-      if (!anime.external_id) continue; // Пропускаем, если нет external_id
-      const apiEpisodes = await this.fetchFromApi(
-        `/title/${anime.external_id}/episodes?withPlayer=true`,
-      );
-      for (const ep of apiEpisodes) {
-        const episode =
-          (await this.episodeRepository.findOne({
-            where: { anime: { id: anime.id }, number: ep.number },
-          })) ??
-          this.episodeRepository.create({
-            id: uuidv4(),
-            anime,
-            number: ep.number,
-            video_url: ep.player.link,
-            subtitles_url: ep.subtitles?.url || null,
-          });
-        await this.episodeRepository.save(episode);
-      }
-      // Обновляем кэш после синхронизации
-      const cacheKey = `episodes_anime_${anime.id}`;
-      const episodes = await this.episodeRepository.find({
-        where: { anime: { id: anime.id } },
-        order: { number: 'ASC' },
-      });
-      await this.cacheManager.set(cacheKey, episodes, 3600);
-    }
-  }
-
   async getEpisodes(animeId: string) {
     const cacheKey = `episodes_anime_${animeId}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
@@ -86,8 +52,14 @@ export class EpisodeService {
             anime,
             number: ep.number,
             video_url: ep.player.link,
+            video_url_480: ep.player.hls_480 || null,
+            video_url_720: ep.player.hls_720 || null,
+            video_url_1080: ep.player.hls_1080 || null,
+            opening: ep.opening || null,
+            ending: ep.ending || null,
+            duration: ep.duration || null,
             subtitles_url: ep.subtitles?.url || null,
-          });
+          } as Partial<Episode>);
           await this.episodeRepository.save(episode);
         }
         episodes = await this.episodeRepository.find({

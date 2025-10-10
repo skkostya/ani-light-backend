@@ -53,17 +53,6 @@ export class AnimeController {
     };
   }
 
-  @Get('sync')
-  async syncAnimeData() {
-    // Проверяем, что пользователь аутентифицирован (опционально)
-    // if (!req.user) {
-    //   throw new UnauthorizedException('Требуется аутентификация');
-    // }
-
-    await this.animeService.syncAnimeData();
-    return { message: 'Синхронизация данных завершена' };
-  }
-
   @Get(':id')
   async getAnimeDetails(@Param() params: UuidParamDto, @Request() req: any) {
     const result = await this.animeService.getAnimeDetails(params.id);
