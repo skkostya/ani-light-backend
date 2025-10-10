@@ -119,16 +119,26 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3001);
 
   // Graceful shutdown
-  process.on('SIGTERM', async () => {
+  process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully...');
-    await app.close();
-    process.exit(0);
+    (async () => {
+      await app.close();
+      process.exit(0);
+    })().catch((error) => {
+      console.error('Error during graceful shutdown:', error);
+      process.exit(1);
+    });
   });
 
-  process.on('SIGINT', async () => {
+  process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully...');
-    await app.close();
-    process.exit(0);
+    (async () => {
+      await app.close();
+      process.exit(0);
+    })().catch((error) => {
+      console.error('Error during graceful shutdown:', error);
+      process.exit(1);
+    });
   });
 
   // Обработка необработанных исключений
