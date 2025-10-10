@@ -1,4 +1,3 @@
-import { HttpService } from '@nestjs/axios';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -24,7 +23,6 @@ export class EpisodeService {
     private episodeRepository: Repository<Episode>,
     @InjectRepository(Anime)
     private animeRepository: Repository<Anime>,
-    private httpService: HttpService,
     private httpRetryService: HttpRetryService,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,

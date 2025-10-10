@@ -1,5 +1,9 @@
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { redisStore } from 'cache-manager-redis-store';
+import { HttpRetryService } from 'src/common/services/http-retry.service';
+import { SecurityAuditService } from 'src/common/services/security-audit.service';
 import { AnimeGenreService } from './anime/anime-genre.service';
 import { AnimeService } from './anime/anime.service';
 import { AnimeGenre } from './anime/entities/anime-genre.entity';
@@ -41,12 +45,22 @@ const SERVICES = [
   AnimeService,
   AnimeGenreService,
   EpisodeService,
+  HttpRetryService,
+  SecurityAuditService,
 ];
 
 const CONTROLLERS = [AgeRatingController, GenreController];
 
 @Module({
-  imports: [TypeOrmModule.forFeature(ENTITIES)],
+  imports: [
+    TypeOrmModule.forFeature(ENTITIES),
+    CacheModule.register({
+      store: redisStore,
+      host: process.env.REDIS_HOST || 'localhost',
+      port: process.env.REDIS_PORT || 6379,
+      ttl: 3600, // Кэш на 1 час
+    }),
+  ],
   controllers: CONTROLLERS,
   providers: SERVICES,
 })

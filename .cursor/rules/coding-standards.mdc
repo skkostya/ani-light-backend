@@ -78,7 +78,6 @@
 ### Пример правильной организации:
 
 ```typescript
-import { HttpService } from '@nestjs/axios';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';

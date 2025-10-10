@@ -74,7 +74,6 @@ export class FeatureService {
   constructor(
     @InjectRepository(Feature)
     private featureRepo: Repository<Feature>,
-    private httpService: HttpService,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
   ) {}
@@ -121,21 +120,9 @@ TypeOrmModule.forRootAsync({
 
 ### Работа с внешними API:
 
-- Используйте `HttpService` из `@nestjs/axios`
 - Конвертируйте Observable в Promise через `lastValueFrom()`
 - Выносите URL API в переменные окружения
 - Создавайте приватные методы для работы с API (например, `fetchFromApi()`)
-
-### Пример:
-
-```typescript
-private async fetchFromApi(endpoint: string) {
-  const response = await lastValueFrom(
-    this.httpService.get(`${this.baseUrl}${endpoint}`)
-  );
-  return response.data;
-}
-```
 
 ## Планировщик задач
 

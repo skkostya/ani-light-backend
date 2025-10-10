@@ -4,14 +4,21 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as redisStore from 'cache-manager-redis-store';
+import { SecurityAuditService } from 'src/common/services/security-audit.service';
 import { HttpRetryService } from '../common/services/http-retry.service';
 import { ProfanityFilterService } from '../common/services/profanity-filter.service';
+import { AnimeGenreService } from './anime/anime-genre.service';
 import { AnimeRatingController } from './anime/anime-rating.controller';
 import { AnimeRatingService } from './anime/anime-rating.service';
 import { AnimeController } from './anime/anime.controller';
 import { AnimeService } from './anime/anime.service';
+import { AnimeGenre } from './anime/entities/anime-genre.entity';
 import { AnimeRating } from './anime/entities/anime-rating.entity';
 import { Anime } from './anime/entities/anime.entity';
+import { AgeRating } from './dictionaries/entities/age-rating.entity';
+import { Genre } from './dictionaries/entities/genre.entity';
+import { AgeRatingService } from './dictionaries/services/age-rating.service';
+import { GenreService } from './dictionaries/services/genre.service';
 import { CommentReaction } from './episode/entities/comment-reaction.entity';
 import { EpisodeComment } from './episode/entities/episode-comment.entity';
 import { EpisodeRating } from './episode/entities/episode-rating.entity';
@@ -34,18 +41,24 @@ import { UserService } from './user/user.service';
 
 const ENTITIES = [
   Anime,
+  AnimeGenre,
+  AnimeRating,
   Episode,
+  EpisodeComment,
+  EpisodeRating,
+  CommentReaction,
   User,
   UserAnime,
   UserEpisode,
-  EpisodeComment,
-  CommentReaction,
-  AnimeRating,
-  EpisodeRating,
+  AgeRating,
+  Genre,
 ];
 
 const SERVICES = [
+  AgeRatingService,
+  GenreService,
   AnimeService,
+  AnimeGenreService,
   EpisodeService,
   UserService,
   UserAnimeService,
@@ -55,6 +68,7 @@ const SERVICES = [
   AnimeRatingService,
   ProfanityFilterService,
   HttpRetryService,
+  SecurityAuditService,
 ];
 
 const CONTROLLERS = [

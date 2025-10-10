@@ -1,4 +1,3 @@
-import { HttpService } from '@nestjs/axios';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -36,7 +35,6 @@ export class AnimeService {
     private genreService: GenreService,
     private episodeService: EpisodeService,
     private animeGenreService: AnimeGenreService,
-    private httpService: HttpService,
     private httpRetryService: HttpRetryService,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,

@@ -1,4 +1,3 @@
-import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
@@ -10,10 +9,7 @@ export class HttpRetryService {
   private readonly logger = new Logger(HttpRetryService.name);
   private readonly axiosInstance;
 
-  constructor(
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     // Создаем отдельный экземпляр axios с retry логикой
     this.axiosInstance = axios.create({
       timeout: 10000, // 10 секунд таймаут
