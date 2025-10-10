@@ -186,7 +186,10 @@ export class AnimeService {
 
     const qb = this.animeRepo
       .createQueryBuilder('anime')
-      .leftJoinAndSelect('anime.episodes', 'episodes');
+      .leftJoinAndSelect('anime.episodes', 'episodes')
+      .leftJoinAndSelect('anime.animeGenres', 'animeGenres')
+      .leftJoinAndSelect('animeGenres.genre', 'genre')
+      .leftJoinAndSelect('anime.ageRating', 'ageRating');
 
     if (search) {
       qb.where('anime.title_ru ILIKE :search OR anime.title_en ILIKE :search', {
@@ -194,7 +197,7 @@ export class AnimeService {
       });
     }
     if (genre) {
-      qb.andWhere(':genre = ANY(anime.genres)', { genre });
+      qb.andWhere('genre.name ILIKE :genre', { genre: `%${genre}%` });
     }
     if (year) {
       qb.andWhere('anime.year = :year', { year });
@@ -222,12 +225,22 @@ export class AnimeService {
       anime =
         (await this.animeRepo.findOne({
           where: { id },
-          relations: ['episodes'],
+          relations: [
+            'episodes',
+            'animeGenres',
+            'animeGenres.genre',
+            'ageRating',
+          ],
         })) ?? undefined;
       if (!anime) {
         const data = await this.fetchFromApi<AniLibriaAnime>(
           `/anime/releases/${id}`,
         );
+
+        // Обрабатываем жанры и ограничение по возрасту
+        const genreIds = await this.processGenres(data.genres || []);
+        const ageRatingId = await this.processAgeRating(data.age_rating);
+
         anime = this.animeRepo.create({
           external_id: data.id,
           title_ru: data.name.main,
@@ -251,8 +264,12 @@ export class AnimeService {
           external_created_at: data.created_at
             ? new Date(data.created_at)
             : undefined,
+          age_rating_id: ageRatingId,
         });
         await this.animeRepo.save(anime);
+
+        // Создаем связи с жанрами
+        await this.updateAnimeGenres(anime.id, genreIds);
       }
       await this.cacheManager.set(cacheKey, anime, 3600);
     }
@@ -433,9 +450,65 @@ export class AnimeService {
     const cacheKey = `search_${q}`;
     let results = await this.cacheManager.get(cacheKey);
     if (!results) {
-      results = await this.fetchFromApi<AniLibriaApiResponse<AniLibriaAnime>>(
-        `/app/search/releases?query=${encodeURIComponent(q)}`,
-      );
+      const apiResponse = await this.fetchFromApi<
+        AniLibriaApiResponse<AniLibriaAnime>
+      >(`/app/search/releases?query=${encodeURIComponent(q)}`);
+
+      // Конвертируем результаты API в локальные аниме
+      const animeList: Anime[] = [];
+      for (const apiAnime of apiResponse.data) {
+        // Ищем существующее аниме в базе
+        let anime = await this.animeRepo.findOne({
+          where: { external_id: apiAnime.id },
+          relations: ['animeGenres', 'animeGenres.genre', 'ageRating'],
+        });
+
+        if (!anime) {
+          // Создаем новое аниме
+          const genreIds = await this.processGenres(apiAnime.genres || []);
+          const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
+
+          anime = this.animeRepo.create({
+            external_id: apiAnime.id,
+            title_ru: apiAnime.name.main,
+            title_en: apiAnime.name.english || '',
+            description: apiAnime.description || '',
+            year: apiAnime.year || new Date().getFullYear(),
+            poster_url:
+              apiAnime.poster?.optimized?.preview ||
+              apiAnime.poster?.preview ||
+              '',
+            alias: apiAnime.alias,
+            is_blocked_by_geo: apiAnime.is_blocked_by_geo || false,
+            is_ongoing: apiAnime.is_ongoing || false,
+            publish_day: apiAnime.publish_day
+              ? {
+                  value: apiAnime.publish_day.value,
+                  description: apiAnime.publish_day.description,
+                }
+              : undefined,
+            episodes_total: apiAnime.episodes_total || undefined,
+            average_duration_of_episode:
+              apiAnime.average_duration_of_episode || undefined,
+            external_created_at: apiAnime.created_at
+              ? new Date(apiAnime.created_at)
+              : undefined,
+            age_rating_id: ageRatingId,
+          });
+          await this.animeRepo.save(anime);
+
+          // Создаем связи с жанрами
+          await this.updateAnimeGenres(anime.id, genreIds);
+        }
+
+        animeList.push(anime);
+      }
+
+      results = {
+        data: animeList,
+        meta: apiResponse.meta,
+      };
+
       await this.cacheManager.set(cacheKey, results, 3600);
     }
     return results;
