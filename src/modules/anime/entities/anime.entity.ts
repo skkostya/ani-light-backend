@@ -50,9 +50,6 @@ export class Anime {
   @Column('text')
   description: string;
 
-  @Column('text', { array: true, nullable: true })
-  genres?: string[]; // Временно оставляем для миграции
-
   @Column({ nullable: true })
   age_rating_id?: string;
 

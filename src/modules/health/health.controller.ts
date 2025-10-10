@@ -86,6 +86,33 @@ export class HealthController {
   }
 
   @Get('external')
+  @ApiOperation({
+    summary: 'Проверка внешних сервисов',
+    description: 'Проверяет доступность внешних API (AniLibria)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Внешние сервисы доступны',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ok' },
+        info: {
+          type: 'object',
+          properties: {
+            anilibria_api: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Внешние сервисы недоступны',
+  })
   @HealthCheck()
   checkExternal() {
     const anilibriaUrl = this.configService.get('ANILIBRIA_API_URL');
@@ -100,6 +127,37 @@ export class HealthController {
   }
 
   @Get('ready')
+  @ApiOperation({
+    summary: 'Проверка готовности',
+    description: 'Проверяет готовность приложения к обработке запросов',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Приложение готово к работе',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ok' },
+        info: {
+          type: 'object',
+          properties: {
+            database: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+            memory_heap: {
+              type: 'object',
+              properties: { status: { type: 'string', example: 'up' } },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Приложение не готово к работе',
+  })
   @HealthCheck()
   checkReadiness() {
     return this.health.check([
@@ -112,6 +170,22 @@ export class HealthController {
   }
 
   @Get('live')
+  @ApiOperation({
+    summary: 'Проверка живости',
+    description:
+      'Проверяет, что приложение работает и может обрабатывать запросы',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Приложение живо',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ok' },
+        info: { type: 'object' },
+      },
+    },
+  })
   @HealthCheck()
   checkLiveness() {
     // Простая проверка живости - всегда возвращает OK

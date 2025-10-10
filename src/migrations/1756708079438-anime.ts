@@ -34,12 +34,6 @@ export class Anime1756708079438 implements MigrationInterface {
             isNullable: false,
           },
           {
-            name: 'genres',
-            type: 'varchar',
-            isArray: true,
-            isNullable: false,
-          },
-          {
             name: 'year',
             type: 'integer',
             isNullable: false,

@@ -75,16 +75,57 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Ani-Light Backend API')
     .setDescription(
-      'API для аниме стриминг платформы с аутентификацией, кэшированием и интеграцией с AniLibria',
+      `# Ani-Light Backend API
+
+Полнофункциональная API для аниме стриминг платформы с поддержкой:
+
+## 🎯 Основные возможности
+- **Аутентификация**: JWT токены + HTTP-only cookies
+- **Аниме контент**: Полная интеграция с AniLibria API
+- **Пользовательские списки**: Избранное, хочу посмотреть, рейтинги
+- **Комментарии и реакции**: Система обсуждений эпизодов
+- **Мониторинг**: Health checks и метрики Prometheus
+- **Справочники**: Жанры и возрастные рейтинги
+
+## 🔐 Аутентификация
+API поддерживает два способа аутентификации:
+1. **Bearer Token** - JWT токен в заголовке Authorization
+2. **Cookie** - JWT токен в httpOnly cookie access_token
+
+## 📊 Мониторинг
+- \`/health\` - общие health checks
+- \`/health/ready\` - готовность к работе
+- \`/health/live\` - проверка живости
+- \`/metrics\` - метрики Prometheus
+
+## 🚀 Быстрый старт
+1. Зарегистрируйтесь через Telegram: \`POST /auth/telegram\`
+2. Получите список аниме: \`GET /anime\`
+3. Добавьте в избранное: \`POST /user/anime\`
+4. Оцените эпизод: \`POST /episodes/{id}/ratings\`
+
+## 📝 Примечания
+- Все эндпоинты требуют аутентификации, кроме health checks
+- Rate limiting применяется к большинству эндпоинтов
+- Поддерживается пагинация для списков
+- Валидация данных на уровне DTO`,
     )
     .setVersion('1.0.0')
-    .addTag('auth', 'Аутентификация и авторизация')
-    .addTag('anime', 'Управление аниме контентом')
-    .addTag('episodes', 'Управление эпизодами')
-    .addTag('users', 'Управление пользователями')
-    .addTag('health', 'Мониторинг и health checks')
-    .addTag('metrics', 'Метрики Prometheus')
-    .addTag('dictionaries', 'Справочники (жанры, возрастные рейтинги)')
+    .setContact(
+      'Ani-Light Team',
+      'https://github.com/ani-light',
+      'support@ani-light.com',
+    )
+    .setLicense('MIT', 'https://opensource.org/licenses/MIT')
+    .addServer('http://localhost:3001', 'Development server')
+    .addServer('https://api.ani-light.com', 'Production server')
+    .addTag('auth', 'Аутентификация и авторизация пользователей')
+    .addTag('anime', 'Управление аниме контентом и рейтингами')
+    .addTag('episodes', 'Управление эпизодами, комментариями и рейтингами')
+    .addTag('users', 'Управление пользователями и их списками')
+    .addTag('health', 'Мониторинг состояния системы')
+    .addTag('metrics', 'Метрики Prometheus для мониторинга')
+    .addTag('dictionaries', 'Справочники жанров и возрастных рейтингов')
     .addBearerAuth(
       {
         type: 'http',
@@ -104,16 +145,38 @@ async function bootstrap() {
     })
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, config, {
+    operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
+  });
+
   SwaggerModule.setup('api', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
       tagsSorter: 'alpha',
       operationsSorter: 'alpha',
+      docExpansion: 'none', // Сворачиваем все секции по умолчанию
+      filter: true, // Включаем поиск
+      showRequestHeaders: true,
+      showCommonExtensions: true,
+      tryItOutEnabled: true,
+      requestInterceptor: (req) => {
+        // Добавляем CORS заголовки для тестирования
+        req.headers['Access-Control-Allow-Origin'] = '*';
+        return req;
+      },
     },
     customSiteTitle: 'Ani-Light API Documentation',
     customfavIcon: '/favicon.ico',
-    customCss: '.swagger-ui .topbar { display: none }',
+    customCss: `
+      .swagger-ui .topbar { display: none }
+      .swagger-ui .info .title { color: #3b82f6; }
+      .swagger-ui .scheme-container { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
+      .swagger-ui .opblock.opblock-post { border-color: #10b981; }
+      .swagger-ui .opblock.opblock-get { border-color: #3b82f6; }
+      .swagger-ui .opblock.opblock-put { border-color: #f59e0b; }
+      .swagger-ui .opblock.opblock-delete { border-color: #ef4444; }
+      .swagger-ui .opblock.opblock-patch { border-color: #8b5cf6; }
+    `,
   });
 
   await app.listen(process.env.PORT ?? 3001);

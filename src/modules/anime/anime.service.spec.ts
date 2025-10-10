@@ -5,7 +5,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
+import { AgeRatingService } from '../dictionaries/services/age-rating.service';
+import { GenreService } from '../dictionaries/services/genre.service';
 import { Episode } from '../episode/entities/episode.entity';
+import { EpisodeService } from '../episode/episode.service';
+import { AnimeGenreService } from './anime-genre.service';
 import { AnimeService } from './anime.service';
 import { Anime } from './entities/anime.entity';
 
@@ -15,6 +19,10 @@ describe('AnimeService', () => {
   let episodeRepository: jest.Mocked<Repository<Episode>>;
   let cacheManager: jest.Mocked<any>;
   let httpRetryService: jest.Mocked<HttpRetryService>;
+  let ageRatingService: jest.Mocked<AgeRatingService>;
+  let genreService: jest.Mocked<GenreService>;
+  let episodeService: jest.Mocked<EpisodeService>;
+  let animeGenreService: jest.Mocked<AnimeGenreService>;
 
   const mockAnime: Partial<Anime> = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -22,7 +30,7 @@ describe('AnimeService', () => {
     title_ru: 'Тестовое аниме',
     title_en: 'Test Anime',
     description: 'Описание тестового аниме',
-    genres: ['action', 'adventure'],
+    animeGenres: [],
     year: 2023,
     poster_url: 'https://example.com/poster.jpg',
   };
@@ -39,8 +47,8 @@ describe('AnimeService', () => {
     const mockRepository = {
       find: jest.fn(),
       findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
+      create: jest.fn().mockReturnValue({ id: 'test-anime-id' }),
+      save: jest.fn().mockResolvedValue({ id: 'test-anime-id' }),
       createQueryBuilder: jest.fn(),
     };
 
@@ -88,6 +96,34 @@ describe('AnimeService', () => {
             get: jest.fn(),
           },
         },
+        {
+          provide: AgeRatingService,
+          useValue: {
+            findByValue: jest.fn(),
+            update: jest.fn(),
+            create: jest.fn(),
+          },
+        },
+        {
+          provide: GenreService,
+          useValue: {
+            processGenresFromApi: jest.fn(),
+            findByName: jest.fn(),
+          },
+        },
+        {
+          provide: EpisodeService,
+          useValue: {
+            findEpisodesByAnimeId: jest.fn(),
+            createEpisodeFromSchedule: jest.fn(),
+          },
+        },
+        {
+          provide: AnimeGenreService,
+          useValue: {
+            updateAnimeGenres: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -96,6 +132,10 @@ describe('AnimeService', () => {
     episodeRepository = module.get(getRepositoryToken(Episode));
     cacheManager = module.get(CACHE_MANAGER);
     httpRetryService = module.get(HttpRetryService);
+    ageRatingService = module.get(AgeRatingService);
+    genreService = module.get(GenreService);
+    episodeService = module.get(EpisodeService);
+    animeGenreService = module.get(AnimeGenreService);
   });
 
   it('should be defined', () => {
@@ -144,8 +184,8 @@ describe('AnimeService', () => {
       await service.getAnimeList(query);
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        ':genre = ANY(anime.genres)',
-        { genre: 'action' },
+        'genre.name ILIKE :genre',
+        { genre: '%action%' },
       );
     });
 
@@ -186,7 +226,12 @@ describe('AnimeService', () => {
       expect(result).toEqual(mockAnime);
       expect(animeRepository.findOne).toHaveBeenCalledWith({
         where: { id: animeId },
-        relations: ['episodes'],
+        relations: [
+          'episodes',
+          'animeGenres',
+          'animeGenres.genre',
+          'ageRating',
+        ],
       });
       expect(cacheManager.set).toHaveBeenCalledWith(
         `anime_${animeId}`,
@@ -205,24 +250,27 @@ describe('AnimeService', () => {
       const result = await service.getEpisodes(animeId);
 
       expect(result).toEqual(mockEpisodes);
-      expect(cacheManager.get).toHaveBeenCalledWith(`episodes_${animeId}`);
+      expect(cacheManager.get).toHaveBeenCalledWith(
+        `episodes_anime_${animeId}`,
+      );
     });
 
     it('should fetch episodes from database if not in cache', async () => {
       const animeId = mockAnime.id!;
       const mockEpisodes = [mockEpisode];
       cacheManager.get.mockResolvedValue(null);
-      episodeRepository.find.mockResolvedValue(mockEpisodes as Episode[]);
+      episodeService.findEpisodesByAnimeId.mockResolvedValue(
+        mockEpisodes as Episode[],
+      );
 
       const result = await service.getEpisodes(animeId);
 
       expect(result).toEqual(mockEpisodes);
-      expect(episodeRepository.find).toHaveBeenCalledWith({
-        where: { anime: { id: animeId } },
-        order: { number: 'ASC' },
-      });
+      expect(episodeService.findEpisodesByAnimeId).toHaveBeenCalledWith(
+        animeId,
+      );
       expect(cacheManager.set).toHaveBeenCalledWith(
-        `episodes_${animeId}`,
+        `episodes_anime_${animeId}`,
         mockEpisodes,
         3600,
       );
@@ -244,17 +292,36 @@ describe('AnimeService', () => {
 
     it('should fetch search results from API if not in cache', async () => {
       const query = 'test';
-      const mockResults = [mockAnime];
+      const mockApiAnime = {
+        id: 1,
+        name: { main: 'Test Anime', english: 'Test Anime' },
+        description: 'Test description',
+        year: 2023,
+        poster: { preview: 'test.jpg' },
+        genres: [],
+        age_rating: { value: 'G' },
+        is_ongoing: false,
+        is_blocked_by_geo: false,
+      };
+      const mockApiResponse = { data: [mockApiAnime] };
       cacheManager.get.mockResolvedValue(null);
-      httpRetryService.get.mockResolvedValue({ data: mockResults });
+      httpRetryService.get.mockResolvedValue({
+        data: mockApiResponse,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      } as any);
+      genreService.processGenresFromApi.mockResolvedValue([]);
+      ageRatingService.findByValue.mockRejectedValue(new Error('Not found'));
 
       const result = await service.searchAnime(query);
 
-      expect(result).toEqual(mockResults);
+      expect(result).toEqual({ data: expect.any(Array), meta: undefined });
       expect(httpRetryService.get).toHaveBeenCalled();
       expect(cacheManager.set).toHaveBeenCalledWith(
         `search_${query}`,
-        mockResults,
+        expect.any(Object),
         3600,
       );
     });

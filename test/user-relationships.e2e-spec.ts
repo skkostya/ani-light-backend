@@ -43,7 +43,7 @@ describe('User Relationships (e2e)', () => {
     title_ru: 'Тестовое аниме',
     title_en: 'Test Anime',
     description: 'Описание тестового аниме',
-    genres: ['Action', 'Adventure'],
+    animeGenres: [],
     year: 2024,
     poster_url: 'https://example.com/poster.jpg',
   };

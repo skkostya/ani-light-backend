@@ -6,9 +6,11 @@ import {
   PrometheusModule,
 } from '@willsoto/nestjs-prometheus';
 import { MetricsInterceptor } from '../../common/interceptors/metrics.interceptor';
+import { MetricsController } from './metrics.controller';
 
 @Module({
   imports: [PrometheusModule],
+  controllers: [MetricsController],
   providers: [
     // Счетчик HTTP запросов
     makeCounterProvider({

@@ -50,12 +50,6 @@ export class AddSearchIndexes1756931199128 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "IDX_anime_title_en_gin" 
       ON "anime" USING gin(to_tsvector('english', "title_en"))
     `);
-
-    // Индекс для фильтрации по жанрам (GIN для массивов)
-    await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_anime_genres_gin" 
-      ON "anime" USING gin("genres")
-    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -66,7 +60,6 @@ export class AddSearchIndexes1756931199128 implements MigrationInterface {
     await queryRunner.dropIndex('anime', 'IDX_anime_year');
 
     // Удаляем специальные PostgreSQL индексы
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_anime_genres_gin"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_anime_title_en_gin"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_anime_title_ru_gin"`);
   }

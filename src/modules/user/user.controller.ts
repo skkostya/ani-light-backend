@@ -7,11 +7,23 @@ import {
   Response,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response as ExpressResponse } from 'express';
 import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
-import { CreateTelegramUserDto, CreateUserDto, LoginDto } from './dto/user.dto';
+import {
+  CreateTelegramUserDto,
+  CreateUserDto,
+  LoginDto,
+  UserResponseDto,
+} from './dto/user.dto';
 import { UserService } from './user.service';
 
 @ApiTags('auth')
@@ -181,6 +193,45 @@ export class UserController {
   }
 
   @Post('telegram')
+  @ApiOperation({
+    summary: 'Авторизация через Telegram',
+    description: 'Создает или авторизует пользователя через Telegram',
+  })
+  @ApiBody({
+    type: CreateTelegramUserDto,
+    description: 'Данные пользователя из Telegram',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Авторизация через Telegram прошла успешно',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'uuid' },
+            username: { type: 'string', example: 'username' },
+            subscription_type: {
+              type: 'string',
+              enum: ['FREE', 'PREMIUM', 'VIP'],
+            },
+            auth_type: { type: 'string', enum: ['TELEGRAM'] },
+            telegram_id: { type: 'string', example: '123456789' },
+            created_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        message: {
+          type: 'string',
+          example: 'Авторизация через Telegram прошла успешно',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Ошибка валидации данных',
+  })
   @Throttle({ short: { limit: 5, ttl: 5000 } }) // Лимит для Telegram авторизации
   async telegramAuth(
     @Body() createTelegramUserDto: CreateTelegramUserDto,
@@ -200,6 +251,20 @@ export class UserController {
   }
 
   @Post('logout')
+  @ApiOperation({
+    summary: 'Выход из системы',
+    description: 'Выходит из системы и очищает аутентификационные cookies',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Выход выполнен успешно',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Выход выполнен успешно' },
+      },
+    },
+  })
   logout(@Response() res: ExpressResponse) {
     // Очищаем cookie с токеном
     res.clearCookie('access_token', {
