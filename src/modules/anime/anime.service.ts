@@ -187,11 +187,12 @@ export class AnimeService {
 
   async getAnimeList(
     query: GetAnimeListDto,
+    userId?: string,
   ): Promise<PaginatedResponseDto<Anime>> {
     const { search, genre, year, limit = 20 } = query;
 
-    // Проверяем кэш
-    const cacheKey = `anime_list_${JSON.stringify(query)}`;
+    // Проверяем кэш (включаем userId в ключ кэша)
+    const cacheKey = `anime_list_${JSON.stringify(query)}_${userId || 'anonymous'}`;
     const cachedResult =
       await this.cacheManager.get<PaginatedResponseDto<Anime>>(cacheKey);
     if (cachedResult) {
@@ -200,7 +201,7 @@ export class AnimeService {
     }
 
     // Сначала ищем в локальной базе данных
-    const localResults = await this.searchInLocalDatabase(query);
+    const localResults = await this.searchInLocalDatabase(query, userId);
 
     // Если результатов недостаточно, дополняем из API
     if (localResults.data.length < limit && (search || (!genre && !year))) {
@@ -220,7 +221,7 @@ export class AnimeService {
         }
 
         // Повторно ищем в базе данных с обновленными данными
-        const updatedResults = await this.searchInLocalDatabase(query);
+        const updatedResults = await this.searchInLocalDatabase(query, userId);
 
         // Кэшируем результат
         await this.cacheManager.set(cacheKey, updatedResults, 3600); // 1 час
@@ -242,6 +243,7 @@ export class AnimeService {
 
   private async searchInLocalDatabase(
     query: GetAnimeListDto,
+    userId?: string,
   ): Promise<PaginatedResponseDto<Anime>> {
     const { search, genre, year, page = 1, limit = 20 } = query;
 
@@ -251,6 +253,16 @@ export class AnimeService {
       .leftJoinAndSelect('anime.animeGenres', 'animeGenres')
       .leftJoinAndSelect('animeGenres.genre', 'genre')
       .leftJoinAndSelect('anime.ageRating', 'ageRating');
+
+    // Если есть авторизованный пользователь, загружаем связь userAnime
+    if (userId) {
+      qb.leftJoinAndSelect(
+        'anime.userAnime',
+        'userAnime',
+        'userAnime.user_id = :userId',
+        { userId },
+      );
+    }
 
     if (search) {
       qb.where('anime.title_ru ILIKE :search OR anime.title_en ILIKE :search', {
@@ -368,20 +380,28 @@ export class AnimeService {
     }
   }
 
-  async getAnimeDetails(id: string) {
-    const cacheKey = `anime_${id}`;
+  async getAnimeDetails(id: string, userId?: string) {
+    const cacheKey = `anime_${id}_${userId || 'anonymous'}`;
     let anime = await this.cacheManager.get<Anime>(cacheKey);
     if (!anime) {
+      const relations = [
+        'episodes',
+        'animeGenres',
+        'animeGenres.genre',
+        'ageRating',
+      ];
+
+      // Если есть авторизованный пользователь, добавляем связь userAnime
+      if (userId) {
+        relations.push('userAnime');
+      }
+
       anime =
         (await this.animeRepo.findOne({
           where: { id },
-          relations: [
-            'episodes',
-            'animeGenres',
-            'animeGenres.genre',
-            'ageRating',
-          ],
+          relations,
         })) ?? undefined;
+
       if (!anime) {
         const data = await this.fetchFromApi<AniLibriaAnime>(
           `/anime/releases/${id}`,
@@ -422,6 +442,23 @@ export class AnimeService {
 
         // Создаем связи с жанрами
         await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
+
+        // Если есть пользователь, загружаем связь userAnime для нового аниме
+        if (userId) {
+          const animeWithUserRelation = await this.animeRepo.findOne({
+            where: { id: anime.id },
+            relations: [
+              'episodes',
+              'animeGenres',
+              'animeGenres.genre',
+              'ageRating',
+              'userAnime',
+            ],
+          });
+          if (animeWithUserRelation) {
+            anime = animeWithUserRelation;
+          }
+        }
       }
       await this.cacheManager.set(cacheKey, anime, 3600);
     }
@@ -502,8 +539,8 @@ export class AnimeService {
     }
   }
 
-  async searchAnime(q: string) {
-    const cacheKey = `search_${q}`;
+  async searchAnime(q: string, userId?: string) {
+    const cacheKey = `search_${q}_${userId || 'anonymous'}`;
     let results = await this.cacheManager.get(cacheKey);
     if (!results) {
       const apiResponse = await this.fetchFromApi<
@@ -514,9 +551,16 @@ export class AnimeService {
       const animeList: Anime[] = [];
       for (const apiAnime of apiResponse.data) {
         // Ищем существующее аниме в базе
+        const relations = ['animeGenres', 'animeGenres.genre', 'ageRating'];
+
+        // Если есть авторизованный пользователь, добавляем связь userAnime
+        if (userId) {
+          relations.push('userAnime');
+        }
+
         let anime = await this.animeRepo.findOne({
           where: { external_id: apiAnime.id },
-          relations: ['animeGenres', 'animeGenres.genre', 'ageRating'],
+          relations,
         });
 
         if (!anime) {
@@ -557,6 +601,22 @@ export class AnimeService {
 
           // Создаем связи с жанрами
           await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
+
+          // Если есть пользователь, загружаем связь userAnime для нового аниме
+          if (userId) {
+            const animeWithUserRelation = await this.animeRepo.findOne({
+              where: { id: anime.id },
+              relations: [
+                'animeGenres',
+                'animeGenres.genre',
+                'ageRating',
+                'userAnime',
+              ],
+            });
+            if (animeWithUserRelation) {
+              anime = animeWithUserRelation;
+            }
+          }
         }
 
         animeList.push(anime);

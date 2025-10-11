@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     super({
-      jwtFromRequest: JwtStrategy.extractJwtFromRequest,
+      jwtFromRequest: (req: Request) => JwtStrategy.extractJwtFromRequest(req),
       ignoreExpiration: false,
       secretOrKey: secret,
     });

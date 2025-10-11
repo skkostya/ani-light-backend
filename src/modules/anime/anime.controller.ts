@@ -142,6 +142,32 @@ export class AnimeController {
                   },
                 },
               },
+              userAnime: {
+                type: 'array',
+                description:
+                  'Связь пользователя с аниме (только для авторизованных пользователей)',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', example: 'uuid' },
+                    user_id: { type: 'string', example: 'uuid' },
+                    anime_id: { type: 'string', example: 'uuid' },
+                    is_favorite: { type: 'boolean', example: false },
+                    want_to_watch: { type: 'boolean', example: true },
+                    notifications_telegram: { type: 'boolean', example: false },
+                    notifications_email: { type: 'boolean', example: false },
+                    rating: { type: 'number', example: 8, nullable: true },
+                    created_at: {
+                      type: 'string',
+                      example: '2023-01-01T00:00:00.000Z',
+                    },
+                    updated_at: {
+                      type: 'string',
+                      example: '2023-01-01T00:00:00.000Z',
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -158,7 +184,10 @@ export class AnimeController {
     },
   })
   async getAnimeList(@Query() query: GetAnimeListDto, @Request() req: any) {
-    const result = await this.animeService.getAnimeList(query);
+    const result = await this.animeService.getAnimeList(
+      query,
+      req.user?.id as string,
+    );
 
     // Добавляем информацию о том, нужно ли показывать рекламу
     return {
@@ -269,6 +298,32 @@ export class AnimeController {
                   },
                 },
               },
+              userAnime: {
+                type: 'array',
+                description:
+                  'Связь пользователя с аниме (только для авторизованных пользователей)',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', example: 'uuid' },
+                    user_id: { type: 'string', example: 'uuid' },
+                    anime_id: { type: 'string', example: 'uuid' },
+                    is_favorite: { type: 'boolean', example: false },
+                    want_to_watch: { type: 'boolean', example: true },
+                    notifications_telegram: { type: 'boolean', example: false },
+                    notifications_email: { type: 'boolean', example: false },
+                    rating: { type: 'number', example: 8, nullable: true },
+                    created_at: {
+                      type: 'string',
+                      example: '2023-01-01T00:00:00.000Z',
+                    },
+                    updated_at: {
+                      type: 'string',
+                      example: '2023-01-01T00:00:00.000Z',
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -290,7 +345,10 @@ export class AnimeController {
     description: 'Слишком много запросов. Превышен лимит rate limiting',
   })
   async searchAnime(@Query() query: SearchDto, @Request() req: any) {
-    const result = await this.animeService.searchAnime(query.q);
+    const result = await this.animeService.searchAnime(
+      query.q,
+      req.user?.id as string,
+    );
 
     return {
       results: result,
@@ -382,6 +440,32 @@ export class AnimeController {
             },
           },
         },
+        userAnime: {
+          type: 'array',
+          description:
+            'Связь пользователя с аниме (только для авторизованных пользователей)',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: 'uuid' },
+              user_id: { type: 'string', example: 'uuid' },
+              anime_id: { type: 'string', example: 'uuid' },
+              is_favorite: { type: 'boolean', example: false },
+              want_to_watch: { type: 'boolean', example: true },
+              notifications_telegram: { type: 'boolean', example: false },
+              notifications_email: { type: 'boolean', example: false },
+              rating: { type: 'number', example: 8, nullable: true },
+              created_at: {
+                type: 'string',
+                example: '2023-01-01T00:00:00.000Z',
+              },
+              updated_at: {
+                type: 'string',
+                example: '2023-01-01T00:00:00.000Z',
+              },
+            },
+          },
+        },
         shouldHideAds: { type: 'boolean', example: false },
         user: {
           type: 'object',
@@ -400,7 +484,10 @@ export class AnimeController {
     description: 'Аниме не найдено',
   })
   async getAnimeDetails(@Param() params: UuidParamDto, @Request() req: any) {
-    const result = await this.animeService.getAnimeDetails(params.id);
+    const result = await this.animeService.getAnimeDetails(
+      params.id,
+      req.user?.id as string,
+    );
 
     return {
       ...result,

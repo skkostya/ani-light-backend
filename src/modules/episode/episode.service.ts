@@ -31,8 +31,8 @@ export class EpisodeService {
     private cacheManager: Cache,
   ) {}
 
-  async getEpisodes(animeId: string) {
-    const cacheKey = `episodes_anime_${animeId}`;
+  async getEpisodes(animeId: string, userId?: string) {
+    const cacheKey = `episodes_anime_${animeId}_${userId || 'anonymous'}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
     if (!episodes) {
       const anime = await this.animeRepository.findOne({
@@ -40,10 +40,20 @@ export class EpisodeService {
       });
       if (!anime)
         throw new NotFoundException(`Anime with ID ${animeId} not found`);
+
+      const relations = ['anime'];
+
+      // Если есть авторизованный пользователь, добавляем связь userEpisodes
+      if (userId) {
+        relations.push('userEpisodes');
+      }
+
       episodes = await this.episodeRepository.find({
         where: { anime: { id: animeId } },
+        relations,
         order: { number: 'ASC' },
       });
+
       if (!episodes.length && anime.external_id) {
         const data = await this.fetchFromApi<AniLibriaAnime>(
           `/anime/releases/${anime.external_id}`,
@@ -69,6 +79,7 @@ export class EpisodeService {
         }
         episodes = await this.episodeRepository.find({
           where: { anime: { id: animeId } },
+          relations,
           order: { number: 'ASC' },
         });
       }
@@ -77,17 +88,59 @@ export class EpisodeService {
     return episodes;
   }
 
-  async getEpisodeDetails(id: string) {
-    const cacheKey = `episode_${id}`;
+  async getEpisodeDetails(id: string, userId?: string) {
+    const cacheKey = `episode_${id}_${userId || 'anonymous'}`;
     let episode = await this.cacheManager.get<Episode>(cacheKey);
     if (!episode) {
+      const relations = ['anime'];
+
+      // Если есть авторизованный пользователь, добавляем связь userEpisodes
+      if (userId) {
+        relations.push('userEpisodes');
+      }
+
       episode =
         (await this.episodeRepository.findOne({
           where: { id },
-          relations: ['anime'],
+          relations,
         })) || undefined;
       if (!episode)
         throw new NotFoundException(`Episode with ID ${id} not found`);
+      await this.cacheManager.set(cacheKey, episode, 3600);
+    }
+    return episode;
+  }
+
+  async getEpisodeByNumber(
+    animeId: string,
+    episodeNumber: number,
+    userId?: string,
+  ) {
+    const cacheKey = `episode_anime_${animeId}_number_${episodeNumber}_${userId || 'anonymous'}`;
+    let episode = await this.cacheManager.get<Episode>(cacheKey);
+    if (!episode) {
+      const relations = ['anime'];
+
+      // Если есть авторизованный пользователь, добавляем связь userEpisodes
+      if (userId) {
+        relations.push('userEpisodes');
+      }
+
+      episode =
+        (await this.episodeRepository.findOne({
+          where: {
+            anime: { id: animeId },
+            number: episodeNumber,
+          },
+          relations,
+        })) ?? undefined;
+
+      if (!episode) {
+        throw new NotFoundException(
+          `Episode with number ${episodeNumber} for anime ${animeId} not found`,
+        );
+      }
+
       await this.cacheManager.set(cacheKey, episode, 3600);
     }
     return episode;
