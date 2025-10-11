@@ -63,6 +63,7 @@ export interface AniLibriaAnime {
   added_in_postponed_collection: number;
   added_in_abandoned_collection: number;
   genres: AniLibriaGenre[];
+  episodes: AniLibriaScheduleEpisode[];
 }
 
 export interface AniLibriaGenre {
@@ -84,6 +85,23 @@ export interface AniLibriaEpisode {
   hls_1080: string | null;
   hls_720: string | null;
   hls_480: string | null;
+  preview?: {
+    preview: string;
+    thumbnail: string;
+    optimized: {
+      preview: string;
+      thumbnail: string;
+    };
+  };
+  opening?: {
+    start: number;
+    stop: number;
+  };
+  ending?: {
+    start: number;
+    stop: number;
+  };
+  duration?: number;
 }
 
 export interface AniLibriaEpisodeResponse {

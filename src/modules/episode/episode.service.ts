@@ -8,7 +8,10 @@ import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { Anime } from '../anime/entities/anime.entity';
-import { AniLibriaScheduleEpisode } from '../anime/types/anilibria-api.types';
+import {
+  AniLibriaAnime,
+  AniLibriaScheduleEpisode,
+} from '../anime/types/anilibria-api.types';
 import { Episode } from './entities/episode.entity';
 
 dotenv.config();
@@ -42,22 +45,25 @@ export class EpisodeService {
         order: { number: 'ASC' },
       });
       if (!episodes.length && anime.external_id) {
-        const apiEpisodes = await this.fetchFromApi(
-          `/title/${anime.external_id}/episodes?withPlayer=true`,
+        const data = await this.fetchFromApi<AniLibriaAnime>(
+          `/anime/releases/${anime.external_id}`,
         );
-        for (const ep of apiEpisodes) {
+        for (const ep of data.episodes) {
           const episode = this.episodeRepository.create({
             id: uuidv4(),
             anime,
-            number: ep.number,
-            video_url: ep.player.link,
-            video_url_480: ep.player.hls_480 || null,
-            video_url_720: ep.player.hls_720 || null,
-            video_url_1080: ep.player.hls_1080 || null,
+            number: ep.sort_order,
+            video_url:
+              this.cleanVideoUrl(ep.hls_1080 || ep.hls_720 || ep.hls_480) || '',
+            video_url_480: this.cleanVideoUrl(ep.hls_480),
+            video_url_720: this.cleanVideoUrl(ep.hls_720),
+            video_url_1080: this.cleanVideoUrl(ep.hls_1080),
             opening: ep.opening || null,
             ending: ep.ending || null,
             duration: ep.duration || null,
-            subtitles_url: ep.subtitles?.url || null,
+            preview_image:
+              ep.preview?.optimized?.preview || ep.preview?.preview || null,
+            subtitles_url: undefined,
           } as Partial<Episode>);
           await this.episodeRepository.save(episode);
         }
@@ -107,29 +113,51 @@ export class EpisodeService {
     const newEpisode = this.episodeRepository.create({
       anime: anime,
       number: episode.ordinal || episode.sort_order,
-      video_url: episode.hls_1080 || episode.hls_720 || episode.hls_480 || '',
-      video_url_480: episode.hls_480 || null,
-      video_url_720: episode.hls_720 || null,
-      video_url_1080: episode.hls_1080 || null,
+      video_url:
+        this.cleanVideoUrl(
+          episode.hls_1080 || episode.hls_720 || episode.hls_480,
+        ) || '',
+      video_url_480: this.cleanVideoUrl(episode.hls_480),
+      video_url_720: this.cleanVideoUrl(episode.hls_720),
+      video_url_1080: this.cleanVideoUrl(episode.hls_1080),
       opening: episode.opening || null,
       ending: episode.ending || null,
       duration: episode.duration || null,
+      preview_image:
+        episode.preview?.optimized?.preview || episode.preview?.preview || null,
       subtitles_url: undefined, // В API расписания нет информации о субтитрах
     } as Partial<Episode>);
 
     return await this.episodeRepository.save(newEpisode);
   }
 
-  async findEpisodesByAnimeId(animeId: string): Promise<Episode[]> {
-    return await this.episodeRepository.find({
-      where: { anime: { id: animeId } },
-      order: { number: 'ASC' },
-    });
-  }
-
-  private async fetchFromApi(endpoint: string) {
+  private async fetchFromApi<T>(endpoint: string): Promise<T> {
     const url = `${this.apiUrl}${endpoint}`;
     const response = await this.httpRetryService.get(url);
     return response.data;
+  }
+
+  /**
+   * Очищает URL от параметров isAuthorized, isWithVideoAds, isWithVideoAdsAlways
+   * @param url - исходный URL
+   * @returns очищенный URL
+   */
+  private cleanVideoUrl(url: string | null): string | null {
+    if (!url) return null;
+
+    // Регулярное выражение для удаления параметров isAuthorized, isWithVideoAds, isWithVideoAdsAlways
+    // с любыми значениями
+    let cleanUrl = url
+      .replace(/[?&]isAuthorized=[^&]*/g, '')
+      .replace(/[?&]isWithVideoAds=[^&]*/g, '')
+      .replace(/[?&]isWithVideoAdsAlways=[^&]*/g, '');
+
+    // Исправляем случаи, когда первый параметр был удален и остался & вместо ?
+    cleanUrl = cleanUrl.replace(/^([^?]*)&/, '$1?');
+
+    // Удаляем оставшиеся ? или & в конце
+    cleanUrl = cleanUrl.replace(/[?&]$/, '');
+
+    return cleanUrl;
   }
 }

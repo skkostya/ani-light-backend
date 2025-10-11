@@ -432,8 +432,7 @@ export class AnimeService {
     const cacheKey = `episodes_anime_${id}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
     if (!episodes) {
-      episodes = await this.episodeService.findEpisodesByAnimeId(id);
-      await this.cacheManager.set(cacheKey, episodes, 3600);
+      episodes = await this.episodeService.getEpisodes(id);
     }
     return episodes;
   }

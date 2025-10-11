@@ -87,6 +87,10 @@ export class Episode {
   @Column({ nullable: true })
   duration?: number;
 
+  // Превью изображение эпизода
+  @Column({ nullable: true })
+  preview_image?: string;
+
   @Column('uuid')
   anime_id: string;
 
