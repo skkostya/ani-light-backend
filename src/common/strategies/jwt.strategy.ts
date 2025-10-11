@@ -5,6 +5,11 @@ import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtPayloadDto } from '../../modules/user/dto/user.dto';
 import { UserService } from '../../modules/user/user.service';
+import {
+  AUTH_ERROR_DETAILS,
+  AUTH_ERROR_MESSAGES,
+  AuthErrorType,
+} from '../enums/auth-error.enum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -48,11 +53,33 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.userService.validateUser(payload);
 
     if (!user) {
-      throw new UnauthorizedException('Пользователь не найден');
+      const errorType = AuthErrorType.USER_NOT_FOUND;
+      const message = AUTH_ERROR_MESSAGES[errorType];
+      const details = AUTH_ERROR_DETAILS[errorType];
+
+      throw new UnauthorizedException({
+        error: 'Unauthorized',
+        message,
+        details,
+        errorType,
+        statusCode: 401,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     if (!user.is_active) {
-      throw new UnauthorizedException('Аккаунт заблокирован');
+      const errorType = AuthErrorType.USER_INACTIVE;
+      const message = AUTH_ERROR_MESSAGES[errorType];
+      const details = AUTH_ERROR_DETAILS[errorType];
+
+      throw new UnauthorizedException({
+        error: 'Unauthorized',
+        message,
+        details,
+        errorType,
+        statusCode: 401,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // Возвращаем пользователя с актуальной информацией о подписке

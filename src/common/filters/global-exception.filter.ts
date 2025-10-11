@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
@@ -23,13 +24,42 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      message =
-        typeof exceptionResponse === 'string'
-          ? exceptionResponse
-          : exceptionResponse;
+
+      // Специальная обработка для ошибок авторизации
+      if (exception instanceof UnauthorizedException) {
+        // Если это уже структурированная ошибка авторизации, используем её как есть
+        if (
+          typeof exceptionResponse === 'object' &&
+          exceptionResponse !== null
+        ) {
+          message = exceptionResponse;
+        } else {
+          // Если это простая строка, оборачиваем в стандартную структуру
+          message = {
+            error: 'Unauthorized',
+            message:
+              typeof exceptionResponse === 'string'
+                ? exceptionResponse
+                : 'Unauthorized',
+            statusCode: 401,
+            timestamp: new Date().toISOString(),
+          };
+        }
+      } else {
+        // Для других HTTP исключений используем стандартную обработку
+        message =
+          typeof exceptionResponse === 'string'
+            ? exceptionResponse
+            : exceptionResponse;
+      }
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'Internal server error';
+      message = {
+        error: 'Internal Server Error',
+        message: 'Internal server error',
+        statusCode: 500,
+        timestamp: new Date().toISOString(),
+      };
 
       // Логируем неожиданные ошибки
       this.logger.error(
@@ -38,22 +68,47 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    const errorResponse = {
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      message,
-    };
+    // Если message уже является объектом с полной структурой ошибки, используем его
+    if (
+      typeof message === 'object' &&
+      message !== null &&
+      'statusCode' in message
+    ) {
+      // Добавляем дополнительную информацию о запросе
+      const errorResponse = {
+        ...message,
+        path: request.url,
+        method: request.method,
+      };
 
-    // Логируем HTTP ошибки только в режиме разработки
-    if (process.env.NODE_ENV === 'development' && status >= 400) {
-      this.logger.warn(
-        `HTTP ${status} Error: ${request.method} ${request.url}`,
-        JSON.stringify(errorResponse, null, 2),
-      );
+      // Логируем HTTP ошибки только в режиме разработки
+      if (process.env.NODE_ENV === 'development' && status >= 400) {
+        this.logger.warn(
+          `HTTP ${status} Error: ${request.method} ${request.url}`,
+          JSON.stringify(errorResponse, null, 2),
+        );
+      }
+
+      response.status(status).json(errorResponse);
+    } else {
+      // Стандартная обработка для простых сообщений
+      const errorResponse = {
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        method: request.method,
+        message,
+      };
+
+      // Логируем HTTP ошибки только в режиме разработки
+      if (process.env.NODE_ENV === 'development' && status >= 400) {
+        this.logger.warn(
+          `HTTP ${status} Error: ${request.method} ${request.url}`,
+          JSON.stringify(errorResponse, null, 2),
+        );
+      }
+
+      response.status(status).json(errorResponse);
     }
-
-    response.status(status).json(errorResponse);
   }
 }
