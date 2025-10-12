@@ -40,6 +40,38 @@ export class AnimeService {
     private cacheManager: Cache,
   ) {}
 
+  async syncAllAnime() {
+    let page = 1;
+    let hasNextPage = true;
+    while (hasNextPage) {
+      try {
+        console.log('START----------------------------------------------START');
+        console.info('CURRENT PAGE', page);
+        const apiResponse = await this.fetchFromApi<
+          AniLibriaApiResponse<AniLibriaAnime>
+        >(`/anime/catalog/releases?page=${page}&limit=50`);
+        // Сохраняем новые аниме в базу данных
+        for (const apiAnime of apiResponse.data) {
+          await this.syncSingleAnimeFromApi(apiAnime);
+          await new Promise((resolve) => {
+            setTimeout(resolve, 1000);
+          });
+        }
+        page++;
+        hasNextPage = !!apiResponse.meta.pagination.links?.next;
+        console.info('HAS NEXT PAGE', hasNextPage);
+        console.log('END--------------------------------------------------END');
+      } catch (e) {
+        page++;
+        console.error('ERROR, WHEN TRYING TO FETCH ALL ANIME', e);
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10000);
+      });
+    }
+  }
+
   @Cron('0 9,21 * * *') // 9:00 и 21:00 каждый день
   async syncScheduleData() {
     try {
@@ -189,8 +221,6 @@ export class AnimeService {
     query: GetAnimeListDto,
     userId?: string,
   ): Promise<PaginatedResponseDto<Anime>> {
-    const { search, genre, year, limit = 20 } = query;
-
     // Проверяем кэш (включаем userId в ключ кэша)
     const cacheKey = `anime_list_${JSON.stringify(query)}_${userId || 'anonymous'}`;
     const cachedResult =
@@ -200,44 +230,8 @@ export class AnimeService {
       return cachedResult;
     }
 
-    // Сначала ищем в локальной базе данных
     const localResults = await this.searchInLocalDatabase(query, userId);
-
-    // Если результатов недостаточно, дополняем из API
-    if (localResults.data.length < limit && (search || (!genre && !year))) {
-      console.log(
-        `Local database has ${localResults.data.length} results, need ${limit}. Fetching from API...`,
-      );
-
-      try {
-        const apiResults = await this.searchInApi(
-          query,
-          limit - localResults.data.length,
-        );
-
-        // Сохраняем новые аниме в базу данных
-        for (const apiAnime of apiResults) {
-          await this.syncSingleAnimeFromApi(apiAnime);
-        }
-
-        // Повторно ищем в базе данных с обновленными данными
-        const updatedResults = await this.searchInLocalDatabase(query, userId);
-
-        // Кэшируем результат
-        await this.cacheManager.set(cacheKey, updatedResults, 3600); // 1 час
-
-        return updatedResults;
-      } catch (error) {
-        console.error('Error fetching from API:', error);
-        // Возвращаем то, что есть в локальной базе
-        await this.cacheManager.set(cacheKey, localResults, 300); // 5 минут
-        return localResults;
-      }
-    }
-
-    // Кэшируем результат
     await this.cacheManager.set(cacheKey, localResults, 3600); // 1 час
-
     return localResults;
   }
 
@@ -298,6 +292,7 @@ export class AnimeService {
     try {
       // Формируем параметры запроса к API
       const apiParams = new URLSearchParams();
+      apiParams.append('page', query.page?.toString() || '1');
       apiParams.append('limit', limit.toString());
 
       if (query.search) {

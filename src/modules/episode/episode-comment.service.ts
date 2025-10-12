@@ -102,10 +102,13 @@ export class EpisodeCommentService {
     page: number = 1,
     limit: number = 20,
   ): Promise<{
-    comments: EpisodeComment[];
-    total: number;
-    page: number;
-    limit: number;
+    data: EpisodeComment[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   }> {
     const [comments, total] = await this.commentRepository.findAndCount({
       where: {
@@ -119,11 +122,16 @@ export class EpisodeCommentService {
       take: limit,
     });
 
+    const totalPages = Math.ceil(total / limit);
+
     return {
-      comments,
-      total,
-      page,
-      limit,
+      data: comments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     };
   }
 
@@ -132,10 +140,13 @@ export class EpisodeCommentService {
     page: number = 1,
     limit: number = 20,
   ): Promise<{
-    replies: EpisodeComment[];
-    total: number;
-    page: number;
-    limit: number;
+    data: EpisodeComment[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   }> {
     const [replies, total] = await this.commentRepository.findAndCount({
       where: {
@@ -148,11 +159,16 @@ export class EpisodeCommentService {
       take: limit,
     });
 
+    const totalPages = Math.ceil(total / limit);
+
     return {
-      replies,
-      total,
-      page,
-      limit,
+      data: replies,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     };
   }
 

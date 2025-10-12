@@ -12,26 +12,32 @@ export class PaginationDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(50)
   limit?: number = 20;
 }
 
 export class PaginatedResponseDto<T> {
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
   hasNext: boolean;
   hasPrev: boolean;
 
   constructor(data: T[], total: number, page: number, limit: number) {
+    const totalPages = Math.ceil(total / limit);
+
     this.data = data;
-    this.total = total;
-    this.page = page;
-    this.limit = limit;
-    this.totalPages = Math.ceil(total / limit);
-    this.hasNext = page < this.totalPages;
+    this.pagination = {
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+    this.hasNext = page < totalPages;
     this.hasPrev = page > 1;
   }
 }

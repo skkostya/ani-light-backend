@@ -25,6 +25,16 @@ import { GetAnimeListDto, SearchDto } from './dto/anime.dto';
 export class AnimeController {
   constructor(private readonly animeService: AnimeService) {}
 
+  @Get('sync')
+  @ApiOperation({
+    summary: 'Загрузить все доступные аниме в базу',
+    description:
+      'Циклично отправляет запросы в anilibria api за аниме раз в полминуты по 50 элементов',
+  })
+  async syncAllAnime() {
+    await this.animeService.syncAllAnime();
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Получить список аниме',
@@ -189,7 +199,7 @@ export class AnimeController {
       req.user?.id as string,
     );
 
-    // Добавляем информацию о том, нужно ли показывать рекламу
+    // Возвращаем данные в формате согласно документации API
     return {
       ...result,
       shouldHideAds: req.user?.shouldHideAds || false,
@@ -222,7 +232,7 @@ export class AnimeController {
     schema: {
       type: 'object',
       properties: {
-        results: {
+        data: {
           type: 'array',
           items: {
             type: 'object',
@@ -345,13 +355,13 @@ export class AnimeController {
     description: 'Слишком много запросов. Превышен лимит rate limiting',
   })
   async searchAnime(@Query() query: SearchDto, @Request() req: any) {
-    const result = await this.animeService.searchAnime(
+    const result = (await this.animeService.searchAnime(
       query.q,
       req.user?.id as string,
-    );
+    )) as { data: any[]; meta: any };
 
     return {
-      results: result,
+      data: result.data,
       shouldHideAds: req.user?.shouldHideAds || false,
       user: req.user
         ? {
@@ -519,7 +529,7 @@ export class AnimeController {
     schema: {
       type: 'object',
       properties: {
-        episodes: {
+        data: {
           type: 'array',
           items: {
             type: 'object',
@@ -566,7 +576,7 @@ export class AnimeController {
     const result = await this.animeService.getEpisodes(params.id);
 
     return {
-      episodes: result,
+      data: result,
       shouldHideAds: req.user?.shouldHideAds || false,
       user: req.user
         ? {
