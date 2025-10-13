@@ -1,15 +1,13 @@
 import {
-  Body,
   Controller,
-  Delete,
   Get,
   Param,
-  Patch,
   Post,
   Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBody,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -17,51 +15,32 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UuidParamDto } from '../../common/dto/uuid-param.dto';
+import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
 import { AnimeService } from './anime.service';
-import {
-  CreateAnimeDto,
-  GetAnimeListDto,
-  UpdateAnimeDto,
-} from './dto/anime.dto';
+import { GetAnimeListDto } from './dto/anime.dto';
 
 @ApiTags('anime')
 @Controller('anime')
+@UseGuards(OptionalJwtGuard) // Применяем опциональную аутентификацию ко всем эндпоинтам
 export class AnimeController {
   constructor(private readonly animeService: AnimeService) {}
 
-  @Post()
-  @ApiOperation({
-    summary: 'Создать новое аниме',
-    description: 'Создает новую запись аниме в базе данных',
-  })
-  @ApiBody({ type: CreateAnimeDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Аниме успешно создано',
-    schema: {
-      example: {
-        id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
-        name: 'Re: Жизнь в другом мире с нуля',
-        name_english: 'Re: Zero kara Hajimeru Isekai Seikatsu',
-        image: '',
-        rating: 8.45,
-        last_year: 2023,
-        first_year: 2010,
-        total_releases: 10,
-        total_episodes: 25,
-        total_duration: '2 дня 5 часов',
-        total_duration_in_seconds: 183600,
-      },
-    },
-  })
-  async create(@Body() createAnimeDto: CreateAnimeDto) {
-    return await this.animeService.create(createAnimeDto);
-  }
+  /**
+   * Все эндпоинты поддерживают опциональную аутентификацию.
+   * Для авторизованных пользователей в ответах включается связь userAnime
+   * с данными о взаимодействии пользователя с аниме (избранное, рейтинг, уведомления и т.д.)
+   *
+   * Аутентификация:
+   * - Bearer токен: Authorization: Bearer <token>
+   * - Cookie: access_token=<token>
+   * - Без аутентификации: связь userAnime не включается в ответ
+   */
 
   @Get()
   @ApiOperation({
     summary: 'Получить список аниме',
-    description: 'Возвращает список аниме с пагинацией и фильтрацией',
+    description:
+      'Возвращает список аниме с пагинацией и фильтрацией. Поддерживает опциональную аутентификацию через Bearer токен или cookies.',
   })
   @ApiQuery({
     name: 'search',
@@ -119,7 +98,8 @@ export class AnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Список аниме успешно получен',
+    description:
+      'Список аниме успешно получен. Для авторизованных пользователей включает связь userAnime',
     schema: {
       example: {
         data: [
@@ -135,6 +115,20 @@ export class AnimeController {
             total_episodes: 25,
             total_duration: '2 дня 5 часов',
             total_duration_in_seconds: 183600,
+            userAnime: [
+              {
+                id: 'user-anime-uuid',
+                user_id: 'user-uuid',
+                anime_id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
+                is_favorite: true,
+                want_to_watch: false,
+                notifications_telegram: true,
+                notifications_email: false,
+                rating: 9,
+                created_at: '2024-01-01T00:00:00.000Z',
+                updated_at: '2024-01-01T00:00:00.000Z',
+              },
+            ],
           },
         ],
         pagination: {
@@ -148,14 +142,15 @@ export class AnimeController {
       },
     },
   })
-  async findAll(@Query() query: GetAnimeListDto) {
-    return await this.animeService.findAll(query);
+  async findAll(@Query() query: GetAnimeListDto, @Request() req: any) {
+    return await this.animeService.findAll(query, req.user?.id);
   }
 
   @Get(':id')
   @ApiOperation({
     summary: 'Получить аниме по ID',
-    description: 'Возвращает информацию об аниме по его идентификатору',
+    description:
+      'Возвращает информацию об аниме по его идентификатору. Поддерживает опциональную аутентификацию через Bearer токен или cookies.',
   })
   @ApiParam({
     name: 'id',
@@ -164,7 +159,8 @@ export class AnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Аниме найдено',
+    description:
+      'Аниме найдено. Для авторизованных пользователей включает связь userAnime',
     schema: {
       example: {
         id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
@@ -179,6 +175,20 @@ export class AnimeController {
         total_duration: '2 дня 5 часов',
         total_duration_in_seconds: 183600,
         animeReleases: [],
+        userAnime: [
+          {
+            id: 'user-anime-uuid',
+            user_id: 'user-uuid',
+            anime_id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
+            is_favorite: true,
+            want_to_watch: false,
+            notifications_telegram: true,
+            notifications_email: false,
+            rating: 9,
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          },
+        ],
       },
     },
   })
@@ -186,57 +196,8 @@ export class AnimeController {
     status: 404,
     description: 'Аниме не найдено',
   })
-  async findOne(@Param() params: UuidParamDto) {
-    return await this.animeService.findOne(params.id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({
-    summary: 'Обновить аниме',
-    description: 'Обновляет информацию об аниме',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'UUID аниме',
-    example: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
-  })
-  @ApiBody({ type: UpdateAnimeDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Аниме успешно обновлено',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Аниме не найдено',
-  })
-  async update(
-    @Param() params: UuidParamDto,
-    @Body() updateAnimeDto: UpdateAnimeDto,
-  ) {
-    return await this.animeService.update(params.id, updateAnimeDto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({
-    summary: 'Удалить аниме',
-    description: 'Удаляет аниме из базы данных',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'UUID аниме',
-    example: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Аниме успешно удалено',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Аниме не найдено',
-  })
-  async remove(@Param() params: UuidParamDto) {
-    await this.animeService.remove(params.id);
-    return { message: 'Аниме успешно удалено' };
+  async findOne(@Param() params: UuidParamDto, @Request() req: any) {
+    return await this.animeService.findOne(params.id, req.user?.id);
   }
 
   @Get(':id/stats')
@@ -273,7 +234,8 @@ export class AnimeController {
   @Get('genre/:genreName')
   @ApiOperation({
     summary: 'Получить аниме по жанру',
-    description: 'Возвращает список аниме определенного жанра с пагинацией',
+    description:
+      'Возвращает список аниме определенного жанра с пагинацией. Поддерживает опциональную аутентификацию через Bearer токен или cookies.',
   })
   @ApiParam({
     name: 'genreName',
@@ -294,19 +256,26 @@ export class AnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Список аниме по жанру получен',
+    description:
+      'Список аниме по жанру получен. Для авторизованных пользователей включает связь userAnime',
   })
   async getByGenre(
     @Param('genreName') genreName: string,
     @Query() query: GetAnimeListDto,
+    @Request() req: any,
   ) {
-    return await this.animeService.getAnimeByGenre(genreName, query);
+    return await this.animeService.getAnimeByGenre(
+      genreName,
+      query,
+      req.user?.id,
+    );
   }
 
   @Get('ongoing')
   @ApiOperation({
     summary: 'Получить продолжающиеся аниме',
-    description: 'Возвращает список аниме со статусом "в процессе"',
+    description:
+      'Возвращает список аниме со статусом "в процессе". Поддерживает опциональную аутентификацию через Bearer токен или cookies.',
   })
   @ApiQuery({
     name: 'page',
@@ -322,10 +291,11 @@ export class AnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Список продолжающихся аниме получен',
+    description:
+      'Список продолжающихся аниме получен. Для авторизованных пользователей включает связь userAnime',
   })
-  async getOngoing(@Query() query: GetAnimeListDto) {
-    return await this.animeService.getOngoingAnime(query);
+  async getOngoing(@Query() query: GetAnimeListDto, @Request() req: any) {
+    return await this.animeService.getOngoingAnime(query, req.user?.id);
   }
 
   @Get('stats/genres')
@@ -377,7 +347,7 @@ export class AnimeController {
   @ApiOperation({
     summary: 'Получить релизы аниме',
     description:
-      'Возвращает все релизы аниме с эпизодами, жанрами, возрастными ограничениями и рейтингом',
+      'Возвращает все релизы аниме с эпизодами, жанрами, возрастными ограничениями и рейтингом. Поддерживает опциональную аутентификацию через Bearer токен или cookies.',
   })
   @ApiParam({
     name: 'id',
@@ -386,7 +356,8 @@ export class AnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Релизы аниме получены',
+    description:
+      'Релизы аниме получены. Для авторизованных пользователей включает связь userAnime',
     schema: {
       example: {
         id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
@@ -452,6 +423,20 @@ export class AnimeController {
             ],
           },
         ],
+        userAnime: [
+          {
+            id: 'user-anime-uuid',
+            user_id: 'user-uuid',
+            anime_id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
+            is_favorite: true,
+            want_to_watch: false,
+            notifications_telegram: true,
+            notifications_email: false,
+            rating: 9,
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          },
+        ],
       },
     },
   })
@@ -459,7 +444,7 @@ export class AnimeController {
     status: 404,
     description: 'Аниме не найдено',
   })
-  async getAnimeReleases(@Param() params: UuidParamDto) {
-    return await this.animeService.getAnimeReleases(params.id);
+  async getAnimeReleases(@Param() params: UuidParamDto, @Request() req: any) {
+    return await this.animeService.getAnimeReleases(params.id, req.user?.id);
   }
 }

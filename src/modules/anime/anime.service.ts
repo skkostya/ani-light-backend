@@ -5,12 +5,7 @@ import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { AniLibriaFranchiseResponse } from '../anime-release/types/anilibria-api.types';
-import {
-  CreateAnimeDto,
-  ExternalApiAnimeDto,
-  GetAnimeListDto,
-  UpdateAnimeDto,
-} from './dto/anime.dto';
+import { ExternalApiAnimeDto, GetAnimeListDto } from './dto/anime.dto';
 import { Anime } from './entities/anime.entity';
 
 @Injectable()
@@ -93,12 +88,10 @@ export class AnimeService {
     }
   }
 
-  async create(createAnimeDto: CreateAnimeDto): Promise<Anime> {
-    const anime = this.animeRepository.create(createAnimeDto);
-    return this.animeRepository.save(anime);
-  }
-
-  async findAll(query: GetAnimeListDto): Promise<PaginatedResponseDto<Anime>> {
+  async findAll(
+    query: GetAnimeListDto,
+    userId?: string,
+  ): Promise<PaginatedResponseDto<Anime>> {
     const {
       search,
       min_rating,
@@ -116,6 +109,16 @@ export class AnimeService {
       .leftJoinAndSelect('anime.animeReleases', 'animeReleases')
       .leftJoinAndSelect('animeReleases.animeGenres', 'animeGenres')
       .leftJoinAndSelect('animeGenres.genre', 'genre');
+
+    // Добавляем связь userAnime для текущего пользователя, если он авторизован
+    if (userId) {
+      qb.leftJoinAndSelect(
+        'anime.userAnime',
+        'userAnime',
+        'userAnime.user_id = :userId',
+        { userId },
+      );
+    }
 
     // Поиск по названию
     if (search) {
@@ -163,24 +166,29 @@ export class AnimeService {
     return new PaginatedResponseDto(animeList, total, page, limit);
   }
 
-  async findOne(id: string): Promise<Anime> {
+  async findOne(id: string, userId?: string): Promise<Anime> {
+    const relations = ['animeReleases'];
+
+    // Добавляем связь userAnime для текущего пользователя, если он авторизован
+    if (userId) {
+      relations.push('userAnime');
+    }
+
     const anime = await this.animeRepository.findOne({
       where: { id },
-      relations: ['animeReleases'],
+      relations,
     });
 
     if (!anime) {
       throw new NotFoundException(`Anime with ID ${id} not found`);
     }
 
+    // Если пользователь авторизован, фильтруем userAnime только для текущего пользователя
+    if (userId && anime.userAnime) {
+      anime.userAnime = anime.userAnime.filter((ua) => ua.user_id === userId);
+    }
+
     return anime;
-  }
-
-  async update(id: string, updateAnimeDto: UpdateAnimeDto): Promise<Anime> {
-    const anime = await this.findOne(id);
-
-    Object.assign(anime, updateAnimeDto);
-    return this.animeRepository.save(anime);
   }
 
   async remove(id: string): Promise<void> {
@@ -249,6 +257,7 @@ export class AnimeService {
   async getAnimeByGenre(
     genreName: string,
     query: GetAnimeListDto,
+    userId?: string,
   ): Promise<PaginatedResponseDto<Anime>> {
     const { page = 1, limit = 20 } = query;
 
@@ -260,6 +269,16 @@ export class AnimeService {
       .where('genre.name ILIKE :genreName', { genreName: `%${genreName}%` })
       .orderBy('anime.rating', 'DESC');
 
+    // Добавляем связь userAnime для текущего пользователя, если он авторизован
+    if (userId) {
+      qb.leftJoinAndSelect(
+        'anime.userAnime',
+        'userAnime',
+        'userAnime.user_id = :userId',
+        { userId },
+      );
+    }
+
     const offset = (page - 1) * limit;
     qb.skip(offset).take(limit);
 
@@ -270,6 +289,7 @@ export class AnimeService {
 
   async getOngoingAnime(
     query: GetAnimeListDto,
+    userId?: string,
   ): Promise<PaginatedResponseDto<Anime>> {
     const { page = 1, limit = 20 } = query;
 
@@ -280,6 +300,16 @@ export class AnimeService {
       .leftJoinAndSelect('animeGenres.genre', 'genre')
       .where('animeReleases.is_ongoing = :is_ongoing', { is_ongoing: true })
       .orderBy('anime.rating', 'DESC');
+
+    // Добавляем связь userAnime для текущего пользователя, если он авторизован
+    if (userId) {
+      qb.leftJoinAndSelect(
+        'anime.userAnime',
+        'userAnime',
+        'userAnime.user_id = :userId',
+        { userId },
+      );
+    }
 
     const offset = (page - 1) * limit;
     qb.skip(offset).take(limit);
@@ -418,21 +448,33 @@ export class AnimeService {
   /**
    * Получает все релизы аниме с полной информацией
    */
-  async getAnimeReleases(id: string): Promise<Anime> {
+  async getAnimeReleases(id: string, userId?: string): Promise<Anime> {
+    const relations = [
+      'animeReleases',
+      'animeReleases.episodes',
+      'animeReleases.ageRating',
+      'animeReleases.animeGenres',
+      'animeReleases.animeGenres.genre',
+      'animeReleases.ratings',
+    ];
+
+    // Добавляем связь userAnime для текущего пользователя, если он авторизован
+    if (userId) {
+      relations.push('userAnime');
+    }
+
     const anime = await this.animeRepository.findOne({
       where: { id },
-      relations: [
-        'animeReleases',
-        'animeReleases.episodes',
-        'animeReleases.ageRating',
-        'animeReleases.animeGenres',
-        'animeReleases.animeGenres.genre',
-        'animeReleases.ratings',
-      ],
+      relations,
     });
 
     if (!anime) {
       throw new NotFoundException(`Anime with ID ${id} not found`);
+    }
+
+    // Если пользователь авторизован, фильтруем userAnime только для текущего пользователя
+    if (userId && anime.userAnime) {
+      anime.userAnime = anime.userAnime.filter((ua) => ua.user_id === userId);
     }
 
     return anime;
