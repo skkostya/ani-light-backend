@@ -163,3 +163,25 @@ export interface AniLibriaScheduleEpisode {
   release_id: number;
   name_english: string | null;
 }
+
+// Типы для API франшиз
+export interface AniLibriaFranchiseResponse {
+  id: string;
+  name: string;
+  name_english: string;
+  image: {
+    preview: string;
+    thumbnail: string;
+    optimized: {
+      preview: string;
+      thumbnail: string;
+    };
+  };
+  rating: number;
+  last_year: number;
+  first_year: number;
+  total_releases: number;
+  total_episodes: number;
+  total_duration: string;
+  total_duration_in_seconds: number;
+}

@@ -8,6 +8,7 @@ import * as dotenv from 'dotenv';
 import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
+import { AnimeService } from '../anime/anime.service';
 import { AgeRatingService } from '../dictionaries/services/age-rating.service';
 import { GenreService } from '../dictionaries/services/genre.service';
 import { Episode } from '../episode/entities/episode.entity';
@@ -18,6 +19,7 @@ import { AnimeRelease } from './entities/anime-release.entity';
 import {
   AniLibriaAnime,
   AniLibriaApiResponse,
+  AniLibriaFranchiseResponse,
   AniLibriaScheduleEpisode,
   AniLibriaScheduleItem,
   AniLibriaScheduleResponse,
@@ -31,6 +33,7 @@ export class AnimeReleaseService {
   constructor(
     @InjectRepository(AnimeRelease)
     private animeReleaseRepo: Repository<AnimeRelease>,
+    private animeService: AnimeService,
     private ageRatingService: AgeRatingService,
     private genreService: GenreService,
     private episodeService: EpisodeService,
@@ -116,6 +119,8 @@ export class AnimeReleaseService {
     );
 
     try {
+      // Получаем данные франшизы для обновления anime
+      const franchiseData = await this.getFranchiseData(release.id);
       // Обрабатываем жанры и возрастные ограничения
       const genreIds = await this.genreService.processGenresFromApi(
         release.genres || [],
@@ -190,6 +195,11 @@ export class AnimeReleaseService {
 
       // Обновляем связи с жанрами
       await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
+
+      // Обновляем данные anime на основе франшизы, если данные получены
+      if (franchiseData) {
+        await this.updateAnimeFromFranchiseData(anime, franchiseData);
+      }
 
       // Обрабатываем эпизод из расписания, если он есть
       if (scheduleItem.published_release_episode) {
@@ -631,6 +641,66 @@ export class AnimeReleaseService {
       await this.cacheManager.set(cacheKey, results, 3600);
     }
     return results;
+  }
+
+  /**
+   * Обновляет или создает anime на основе данных франшизы
+   */
+  private async updateAnimeFromFranchiseData(
+    animeRelease: AnimeRelease,
+    franchiseData: AniLibriaFranchiseResponse,
+  ): Promise<void> {
+    try {
+      // Ищем существующее anime по external_id франшизы
+      let anime = await this.animeService.findOneByExternalId(franchiseData.id);
+
+      if (!anime) {
+        // Создаем новое anime на основе данных франшизы
+        anime = await this.animeService.createFromFranchiseData(franchiseData);
+        console.log(`Created new anime from franchise: ${anime.name}`);
+      } else {
+        // Обновляем существующее anime данными франшизы
+        anime = await this.animeService.updateFromFranchiseData(
+          anime,
+          franchiseData,
+        );
+        console.log(`Updated existing anime from franchise: ${anime.name}`);
+      }
+
+      // Связываем anime-release с anime
+      animeRelease.anime_id = anime.id;
+      await this.animeReleaseRepo.save(animeRelease);
+
+      console.log(
+        `Linked anime-release ${animeRelease.title_ru} with anime ${anime.name}`,
+      );
+    } catch (error) {
+      console.error(`Error updating anime from franchise data:`, error);
+    }
+  }
+
+  /**
+   * Получает данные франшизы по ID релиза из AniLibria API
+   */
+  private async getFranchiseData(
+    releaseId: number,
+  ): Promise<AniLibriaFranchiseResponse | null> {
+    try {
+      const franchiseData = await this.fetchFromApi<
+        AniLibriaFranchiseResponse[]
+      >(`/anime/franchises/release/${releaseId}`);
+
+      // API возвращает массив, берем первый элемент
+      return franchiseData && franchiseData.length > 0
+        ? franchiseData[0]
+        : null;
+    } catch (error) {
+      console.error(
+        `Error fetching franchise data for release ${releaseId}:`,
+        error,
+      );
+      return null;
+    }
   }
 
   private async fetchFromApi<T>(endpoint: string): Promise<T> {

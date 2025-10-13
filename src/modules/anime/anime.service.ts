@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
+import { AniLibriaFranchiseResponse } from '../anime-release/types/anilibria-api.types';
 import {
   CreateAnimeDto,
   ExternalApiAnimeDto,
@@ -353,6 +354,64 @@ export class AnimeService {
       total_episodes: externalAnime.total_episodes,
       total_duration: externalAnime.total_duration,
       total_duration_in_seconds: externalAnime.total_duration_in_seconds,
+    };
+  }
+
+  /**
+   * Находит anime по external_id
+   */
+  async findOneByExternalId(externalId: string): Promise<Anime | null> {
+    return this.animeRepository.findOne({
+      where: { external_id: externalId },
+    });
+  }
+
+  /**
+   * Создает новое anime на основе данных франшизы
+   */
+  async createFromFranchiseData(
+    franchiseData: AniLibriaFranchiseResponse,
+  ): Promise<Anime> {
+    const animeData = this.mapFranchiseDataToAnime(franchiseData);
+    const anime = this.animeRepository.create(animeData);
+    return this.animeRepository.save(anime);
+  }
+
+  /**
+   * Обновляет существующее anime данными франшизы
+   */
+  async updateFromFranchiseData(
+    existingAnime: Anime,
+    franchiseData: AniLibriaFranchiseResponse,
+  ): Promise<Anime> {
+    const animeData = this.mapFranchiseDataToAnime(franchiseData);
+    Object.assign(existingAnime, animeData);
+    return this.animeRepository.save(existingAnime);
+  }
+
+  /**
+   * Маппит данные франшизы в формат сущности Anime
+   */
+  private mapFranchiseDataToAnime(
+    franchiseData: AniLibriaFranchiseResponse,
+  ): Partial<Anime> {
+    return {
+      external_id: franchiseData.id,
+      name: franchiseData.name,
+      name_english: franchiseData.name_english,
+      image:
+        franchiseData.image?.optimized?.preview ||
+        franchiseData.image?.preview ||
+        franchiseData.image?.optimized?.thumbnail ||
+        franchiseData.image?.thumbnail ||
+        undefined,
+      rating: franchiseData.rating,
+      last_year: franchiseData.last_year,
+      first_year: franchiseData.first_year,
+      total_releases: franchiseData.total_releases,
+      total_episodes: franchiseData.total_episodes,
+      total_duration: franchiseData.total_duration,
+      total_duration_in_seconds: franchiseData.total_duration_in_seconds,
     };
   }
 }
