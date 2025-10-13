@@ -414,4 +414,27 @@ export class AnimeService {
       total_duration_in_seconds: franchiseData.total_duration_in_seconds,
     };
   }
+
+  /**
+   * Получает все релизы аниме с полной информацией
+   */
+  async getAnimeReleases(id: string): Promise<Anime> {
+    const anime = await this.animeRepository.findOne({
+      where: { id },
+      relations: [
+        'animeReleases',
+        'animeReleases.episodes',
+        'animeReleases.ageRating',
+        'animeReleases.animeGenres',
+        'animeReleases.animeGenres.genre',
+        'animeReleases.ratings',
+      ],
+    });
+
+    if (!anime) {
+      throw new NotFoundException(`Anime with ID ${id} not found`);
+    }
+
+    return anime;
+  }
 }

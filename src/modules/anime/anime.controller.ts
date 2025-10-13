@@ -372,4 +372,94 @@ export class AnimeController {
   async syncFromApi() {
     return await this.animeService.syncAllAnimeFromApi();
   }
+
+  @Get(':id/releases')
+  @ApiOperation({
+    summary: 'Получить релизы аниме',
+    description:
+      'Возвращает все релизы аниме с эпизодами, жанрами, возрастными ограничениями и рейтингом',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID аниме',
+    example: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Релизы аниме получены',
+    schema: {
+      example: {
+        id: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
+        name: 'Re: Жизнь в другом мире с нуля',
+        name_english: 'Re: Zero kara Hajimeru Isekai Seikatsu',
+        animeReleases: [
+          {
+            id: 'release-uuid-1',
+            title_ru: 'Re: Жизнь в другом мире с нуля',
+            title_en: 'Re: Zero kara Hajimeru Isekai Seikatsu',
+            description: 'Описание релиза',
+            year: 2016,
+            poster_url: 'https://example.com/poster.jpg',
+            alias: 're-zero',
+            is_ongoing: false,
+            episodes_total: 25,
+            average_duration_of_episode: 1440,
+            ageRating: {
+              id: 'age-rating-uuid',
+              value: '16+',
+              label: '16+',
+              is_adult: false,
+              description: 'Для зрителей старше 16 лет',
+            },
+            animeGenres: [
+              {
+                id: 'anime-genre-uuid-1',
+                genre: {
+                  id: 'genre-uuid-1',
+                  name: 'action',
+                  name_ru: 'Экшен',
+                },
+              },
+              {
+                id: 'anime-genre-uuid-2',
+                genre: {
+                  id: 'genre-uuid-2',
+                  name: 'drama',
+                  name_ru: 'Драма',
+                },
+              },
+            ],
+            episodes: [
+              {
+                id: 'episode-uuid-1',
+                title: 'Эпизод 1',
+                episode_number: 1,
+                duration: 1440,
+                description: 'Описание эпизода',
+                video_url: 'https://example.com/video1.mp4',
+                preview_url: 'https://example.com/preview1.jpg',
+              },
+            ],
+            ratings: [
+              {
+                id: 'rating-uuid-1',
+                user_id: 'user-uuid-1',
+                anime_id: 'anime-uuid',
+                rating: 9.5,
+                created_at: '2024-01-01T00:00:00.000Z',
+                updated_at: '2024-01-01T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Аниме не найдено',
+  })
+  async getAnimeReleases(@Param() params: UuidParamDto) {
+    return await this.animeService.getAnimeReleases(params.id);
+  }
 }
