@@ -19,17 +19,19 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AnimeRatingService } from './anime-rating.service';
+import { AnimeReleaseRatingService } from './anime-release-rating.service';
 import {
   AnimeRatingResponseDto,
   CreateAnimeRatingDto,
   UpdateAnimeRatingDto,
-} from './dto/anime-rating.dto';
+} from './dto/anime-release-rating.dto';
 
-@ApiTags('anime')
-@Controller('anime/:animeId/ratings')
-export class AnimeRatingController {
-  constructor(private readonly ratingService: AnimeRatingService) {}
+@ApiTags('anime-release')
+@Controller('anime-release/:animeId/ratings')
+export class AnimeReleaseRatingController {
+  constructor(
+    private readonly animeReleaseRatingService: AnimeReleaseRatingService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -71,7 +73,7 @@ export class AnimeRatingController {
     @Param('animeId') animeId: string,
     @Body() createDto: CreateAnimeRatingDto,
   ) {
-    return this.ratingService.create(req.user.id, {
+    return this.animeReleaseRatingService.create(req.user.id, {
       ...createDto,
       anime_id: animeId,
     });
@@ -98,7 +100,7 @@ export class AnimeRatingController {
     description: 'Аниме не найдено',
   })
   findAll(@Param('animeId') animeId: string) {
-    return this.ratingService.findByAnime(animeId);
+    return this.animeReleaseRatingService.findByAnime(animeId);
   }
 
   @Get('average')
@@ -128,7 +130,7 @@ export class AnimeRatingController {
     description: 'Аниме не найдено',
   })
   getAverage(@Param('animeId') animeId: string) {
-    return this.ratingService.getAverageRating(animeId);
+    return this.animeReleaseRatingService.getAverageRating(animeId);
   }
 
   @Get('my')
@@ -159,7 +161,7 @@ export class AnimeRatingController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   findMy(@Request() req, @Param('animeId') animeId: string) {
-    return this.ratingService.findOne(req.user.id, animeId);
+    return this.animeReleaseRatingService.findOne(req.user.id, animeId);
   }
 
   @Patch('my')
@@ -202,7 +204,11 @@ export class AnimeRatingController {
     @Param('animeId') animeId: string,
     @Body() updateDto: UpdateAnimeRatingDto,
   ) {
-    return this.ratingService.update(req.user.id, animeId, updateDto);
+    return this.animeReleaseRatingService.update(
+      req.user.id,
+      animeId,
+      updateDto,
+    );
   }
 
   @Delete('my')
@@ -232,6 +238,6 @@ export class AnimeRatingController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   removeMy(@Request() req, @Param('animeId') animeId: string) {
-    return this.ratingService.remove(req.user.id, animeId);
+    return this.animeReleaseRatingService.remove(req.user.id, animeId);
   }
 }

@@ -6,7 +6,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Anime } from '../../anime/entities/anime.entity';
+import { AnimeRelease } from '../../anime-release/entities/anime-release.entity';
 
 // Интерфейсы для типизации связей
 export interface UserEpisodeRelation {
@@ -47,9 +47,9 @@ export class Episode {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Anime, (anime) => anime.episodes)
+  @ManyToOne(() => AnimeRelease, (animeRelease) => animeRelease.episodes)
   @JoinColumn({ name: 'anime_id' })
-  anime: Anime;
+  animeRelease: AnimeRelease;
 
   @Column()
   number: number;

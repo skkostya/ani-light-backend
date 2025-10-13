@@ -4,27 +4,27 @@ export class AddSearchIndexes1756931199128 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Индекс для фильтрации по году
     await queryRunner.createIndex(
-      'anime',
+      'anime_release',
       new TableIndex({
-        name: 'IDX_anime_year',
+        name: 'IDX_anime_release_year',
         columnNames: ['year'],
       }),
     );
 
     // Индекс для external_id (для связи с AniLibria API)
     await queryRunner.createIndex(
-      'anime',
+      'anime_release',
       new TableIndex({
-        name: 'IDX_anime_external_id',
+        name: 'IDX_anime_release_external_id',
         columnNames: ['external_id'],
       }),
     );
 
     // Составной индекс для сортировки (год + название)
     await queryRunner.createIndex(
-      'anime',
+      'anime_release',
       new TableIndex({
-        name: 'IDX_anime_year_title',
+        name: 'IDX_anime_release_year_title',
         columnNames: ['year', 'title_ru'],
       }),
     );
@@ -41,26 +41,36 @@ export class AddSearchIndexes1756931199128 implements MigrationInterface {
     // Специальные PostgreSQL индексы через query (GIN индексы не поддерживаются в TypeORM API)
     // Индекс для поиска по русскому названию (регистронезависимый)
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_anime_title_ru_gin" 
-      ON "anime" USING gin(to_tsvector('russian', "title_ru"))
+      CREATE INDEX IF NOT EXISTS "IDX_anime_release_title_ru_gin" 
+      ON "anime_release" USING gin(to_tsvector('russian', "title_ru"))
     `);
 
     // Индекс для поиска по английскому названию (регистронезависимый)
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_anime_title_en_gin" 
-      ON "anime" USING gin(to_tsvector('english', "title_en"))
+      CREATE INDEX IF NOT EXISTS "IDX_anime_release_title_en_gin" 
+      ON "anime_release" USING gin(to_tsvector('english', "title_en"))
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Удаляем TypeORM индексы
     await queryRunner.dropIndex('episode', 'IDX_episode_anime_number');
-    await queryRunner.dropIndex('anime', 'IDX_anime_year_title');
-    await queryRunner.dropIndex('anime', 'IDX_anime_external_id');
-    await queryRunner.dropIndex('anime', 'IDX_anime_year');
+    await queryRunner.dropIndex(
+      'anime_release',
+      'IDX_anime_release_year_title',
+    );
+    await queryRunner.dropIndex(
+      'anime_release',
+      'IDX_anime_release_external_id',
+    );
+    await queryRunner.dropIndex('anime_release', 'IDX_anime_release_year');
 
     // Удаляем специальные PostgreSQL индексы
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_anime_title_en_gin"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_anime_title_ru_gin"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_anime_release_title_en_gin"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_anime_release_title_ru_gin"`,
+    );
   }
 }

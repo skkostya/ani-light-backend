@@ -4,10 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { redisStore } from 'cache-manager-redis-store';
 import { HttpRetryService } from 'src/common/services/http-retry.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
-import { AnimeGenreService } from './anime/anime-genre.service';
+import { AnimeReleaseGenreService } from './anime-release/anime-release-genre.service';
+import { AnimeReleaseService } from './anime-release/anime-release.service';
+import { AnimeGenre } from './anime-release/entities/anime-release-genre.entity';
+import { AnimeRating } from './anime-release/entities/anime-release-rating.entity';
+import { AnimeRelease } from './anime-release/entities/anime-release.entity';
+import { AnimeController } from './anime/anime.controller';
 import { AnimeService } from './anime/anime.service';
-import { AnimeGenre } from './anime/entities/anime-genre.entity';
-import { AnimeRating } from './anime/entities/anime-rating.entity';
 import { Anime } from './anime/entities/anime.entity';
 import { AgeRatingController } from './dictionaries/controllers/age-rating.controller';
 import { GenreController } from './dictionaries/controllers/genre.controller';
@@ -26,6 +29,7 @@ import { User } from './user/entities/user.entity';
 
 const ENTITIES = [
   Anime,
+  AnimeRelease,
   AnimeGenre,
   AnimeRating,
   Episode,
@@ -43,13 +47,14 @@ const SERVICES = [
   AgeRatingService,
   GenreService,
   AnimeService,
-  AnimeGenreService,
+  AnimeReleaseService,
+  AnimeReleaseGenreService,
   EpisodeService,
   HttpRetryService,
   SecurityAuditService,
 ];
 
-const CONTROLLERS = [AgeRatingController, GenreController];
+const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
 
 @Module({
   imports: [

@@ -7,11 +7,11 @@ import * as dotenv from 'dotenv';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { HttpRetryService } from '../../common/services/http-retry.service';
-import { Anime } from '../anime/entities/anime.entity';
+import { AnimeRelease } from '../anime-release/entities/anime-release.entity';
 import {
   AniLibriaAnime,
   AniLibriaScheduleEpisode,
-} from '../anime/types/anilibria-api.types';
+} from '../anime-release/types/anilibria-api.types';
 import { Episode } from './entities/episode.entity';
 
 dotenv.config();
@@ -24,8 +24,8 @@ export class EpisodeService {
   constructor(
     @InjectRepository(Episode)
     private episodeRepository: Repository<Episode>,
-    @InjectRepository(Anime)
-    private animeRepository: Repository<Anime>,
+    @InjectRepository(AnimeRelease)
+    private animeReleaseRepository: Repository<AnimeRelease>,
     private httpRetryService: HttpRetryService,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
@@ -35,13 +35,13 @@ export class EpisodeService {
     const cacheKey = `episodes_anime_${animeId}_${userId || 'anonymous'}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
     if (!episodes) {
-      const anime = await this.animeRepository.findOne({
+      const anime = await this.animeReleaseRepository.findOne({
         where: { id: animeId },
       });
       if (!anime)
         throw new NotFoundException(`Anime with ID ${animeId} not found`);
 
-      const relations = ['anime'];
+      const relations = ['animeRelease'];
 
       // Если есть авторизованный пользователь, добавляем связь userEpisodes
       if (userId) {
@@ -49,7 +49,7 @@ export class EpisodeService {
       }
 
       episodes = await this.episodeRepository.find({
-        where: { anime: { id: animeId } },
+        where: { animeRelease: { id: animeId } },
         relations,
         order: { number: 'ASC' },
       });
@@ -78,7 +78,7 @@ export class EpisodeService {
           await this.episodeRepository.save(episode);
         }
         episodes = await this.episodeRepository.find({
-          where: { anime: { id: animeId } },
+          where: { animeRelease: { id: animeId } },
           relations,
           order: { number: 'ASC' },
         });
@@ -92,7 +92,7 @@ export class EpisodeService {
     const cacheKey = `episode_${id}_${userId || 'anonymous'}`;
     let episode = await this.cacheManager.get<Episode>(cacheKey);
     if (!episode) {
-      const relations = ['anime'];
+      const relations = ['animeRelease'];
 
       // Если есть авторизованный пользователь, добавляем связь userEpisodes
       if (userId) {
@@ -119,7 +119,7 @@ export class EpisodeService {
     const cacheKey = `episode_anime_${animeId}_number_${episodeNumber}_${userId || 'anonymous'}`;
     let episode = await this.cacheManager.get<Episode>(cacheKey);
     if (!episode) {
-      const relations = ['anime'];
+      const relations = ['animeRelease'];
 
       // Если есть авторизованный пользователь, добавляем связь userEpisodes
       if (userId) {
@@ -129,7 +129,7 @@ export class EpisodeService {
       episode =
         (await this.episodeRepository.findOne({
           where: {
-            anime: { id: animeId },
+            animeRelease: { id: animeId },
             number: episodeNumber,
           },
           relations,
@@ -147,13 +147,13 @@ export class EpisodeService {
   }
 
   async createEpisodeFromSchedule(
-    anime: Anime,
+    animeRelease: AnimeRelease,
     episode: AniLibriaScheduleEpisode,
   ): Promise<Episode> {
     // Проверяем, есть ли уже такой эпизод
     const existingEpisode = await this.episodeRepository.findOne({
       where: {
-        anime: { id: anime.id },
+        animeRelease: { id: animeRelease.id },
         number: episode.ordinal || episode.sort_order,
       },
     });
@@ -164,7 +164,7 @@ export class EpisodeService {
 
     // Создаем новый эпизод
     const newEpisode = this.episodeRepository.create({
-      anime: anime,
+      animeRelease: animeRelease,
       number: episode.ordinal || episode.sort_order,
       video_url:
         this.cleanVideoUrl(

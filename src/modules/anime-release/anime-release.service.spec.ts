@@ -9,22 +9,22 @@ import { AgeRatingService } from '../dictionaries/services/age-rating.service';
 import { GenreService } from '../dictionaries/services/genre.service';
 import { Episode } from '../episode/entities/episode.entity';
 import { EpisodeService } from '../episode/episode.service';
-import { AnimeGenreService } from './anime-genre.service';
-import { AnimeService } from './anime.service';
-import { Anime } from './entities/anime.entity';
+import { AnimeReleaseGenreService } from './anime-release-genre.service';
+import { AnimeReleaseService } from './anime-release.service';
+import { AnimeRelease } from './entities/anime-release.entity';
 
-describe('AnimeService', () => {
-  let service: AnimeService;
-  let animeRepository: jest.Mocked<Repository<Anime>>;
+describe('AnimeReleaseService', () => {
+  let service: AnimeReleaseService;
+  let animeReleaseRepository: jest.Mocked<Repository<AnimeRelease>>;
   let episodeRepository: jest.Mocked<Repository<Episode>>;
   let cacheManager: jest.Mocked<any>;
   let httpRetryService: jest.Mocked<HttpRetryService>;
   let ageRatingService: jest.Mocked<AgeRatingService>;
   let genreService: jest.Mocked<GenreService>;
   let episodeService: jest.Mocked<EpisodeService>;
-  let animeGenreService: jest.Mocked<AnimeGenreService>;
+  let animeReleaseGenreService: jest.Mocked<AnimeReleaseGenreService>;
 
-  const mockAnime: Partial<Anime> = {
+  const mockAnime: Partial<AnimeRelease> = {
     id: '123e4567-e89b-12d3-a456-426614174000',
     external_id: 1,
     title_ru: 'Тестовое аниме',
@@ -68,9 +68,9 @@ describe('AnimeService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AnimeService,
+        AnimeReleaseService,
         {
-          provide: getRepositoryToken(Anime),
+          provide: getRepositoryToken(AnimeRelease),
           useValue: mockRepository,
         },
         {
@@ -114,12 +114,12 @@ describe('AnimeService', () => {
         {
           provide: EpisodeService,
           useValue: {
-            findEpisodesByAnimeId: jest.fn(),
+            getEpisodes: jest.fn(),
             createEpisodeFromSchedule: jest.fn(),
           },
         },
         {
-          provide: AnimeGenreService,
+          provide: AnimeReleaseGenreService,
           useValue: {
             updateAnimeGenres: jest.fn(),
           },
@@ -127,15 +127,15 @@ describe('AnimeService', () => {
       ],
     }).compile();
 
-    service = module.get<AnimeService>(AnimeService);
-    animeRepository = module.get(getRepositoryToken(Anime));
+    service = module.get<AnimeReleaseService>(AnimeReleaseService);
+    animeReleaseRepository = module.get(getRepositoryToken(AnimeRelease));
     episodeRepository = module.get(getRepositoryToken(Episode));
     cacheManager = module.get(CACHE_MANAGER);
     httpRetryService = module.get(HttpRetryService);
     ageRatingService = module.get(AgeRatingService);
     genreService = module.get(GenreService);
     episodeService = module.get(EpisodeService);
-    animeGenreService = module.get(AnimeGenreService);
+    animeReleaseGenreService = module.get(AnimeReleaseGenreService);
   });
 
   it('should be defined', () => {
@@ -148,7 +148,7 @@ describe('AnimeService', () => {
       const mockAnimeList = [mockAnime];
       const totalCount = 1;
 
-      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      const mockQueryBuilder = animeReleaseRepository.createQueryBuilder();
       mockQueryBuilder.getCount = jest.fn().mockResolvedValue(totalCount);
       mockQueryBuilder.getMany = jest.fn().mockResolvedValue(mockAnimeList);
 
@@ -156,14 +156,14 @@ describe('AnimeService', () => {
 
       expect(result).toBeInstanceOf(PaginatedResponseDto);
       expect(result.data).toEqual(mockAnimeList);
-      expect(result.total).toBe(totalCount);
-      expect(result.page).toBe(1);
-      expect(result.limit).toBe(20);
+      expect(result.pagination.total).toBe(totalCount);
+      expect(result.pagination.page).toBe(1);
+      expect(result.pagination.limit).toBe(20);
     });
 
     it('should apply search filter', async () => {
       const query = { search: 'test', page: 1, limit: 20 };
-      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      const mockQueryBuilder = animeReleaseRepository.createQueryBuilder();
       mockQueryBuilder.getCount = jest.fn().mockResolvedValue(0);
       mockQueryBuilder.getMany = jest.fn().mockResolvedValue([]);
 
@@ -177,7 +177,7 @@ describe('AnimeService', () => {
 
     it('should apply genre filter', async () => {
       const query = { genre: 'action', page: 1, limit: 20 };
-      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      const mockQueryBuilder = animeReleaseRepository.createQueryBuilder();
       mockQueryBuilder.getCount = jest.fn().mockResolvedValue(0);
       mockQueryBuilder.getMany = jest.fn().mockResolvedValue([]);
 
@@ -191,7 +191,7 @@ describe('AnimeService', () => {
 
     it('should apply year filter', async () => {
       const query = { year: 2023, page: 1, limit: 20 };
-      const mockQueryBuilder = animeRepository.createQueryBuilder();
+      const mockQueryBuilder = animeReleaseRepository.createQueryBuilder();
       mockQueryBuilder.getCount = jest.fn().mockResolvedValue(0);
       mockQueryBuilder.getMany = jest.fn().mockResolvedValue([]);
 
@@ -213,18 +213,20 @@ describe('AnimeService', () => {
 
       expect(result).toEqual(mockAnime);
       expect(cacheManager.get).toHaveBeenCalledWith(`anime_${animeId}`);
-      expect(animeRepository.findOne).not.toHaveBeenCalled();
+      expect(animeReleaseRepository.findOne).not.toHaveBeenCalled();
     });
 
     it('should fetch anime from database if not in cache', async () => {
       const animeId = mockAnime.id!;
       cacheManager.get.mockResolvedValue(null);
-      animeRepository.findOne.mockResolvedValue(mockAnime as Anime);
+      animeReleaseRepository.findOne.mockResolvedValue(
+        mockAnime as AnimeRelease,
+      );
 
       const result = await service.getAnimeDetails(animeId);
 
       expect(result).toEqual(mockAnime);
-      expect(animeRepository.findOne).toHaveBeenCalledWith({
+      expect(animeReleaseRepository.findOne).toHaveBeenCalledWith({
         where: { id: animeId },
         relations: [
           'episodes',
@@ -259,16 +261,12 @@ describe('AnimeService', () => {
       const animeId = mockAnime.id!;
       const mockEpisodes = [mockEpisode];
       cacheManager.get.mockResolvedValue(null);
-      episodeService.findEpisodesByAnimeId.mockResolvedValue(
-        mockEpisodes as Episode[],
-      );
+      episodeService.getEpisodes.mockResolvedValue(mockEpisodes as Episode[]);
 
       const result = await service.getEpisodes(animeId);
 
       expect(result).toEqual(mockEpisodes);
-      expect(episodeService.findEpisodesByAnimeId).toHaveBeenCalledWith(
-        animeId,
-      );
+      expect(episodeService.getEpisodes).toHaveBeenCalledWith(animeId);
       expect(cacheManager.set).toHaveBeenCalledWith(
         `episodes_anime_${animeId}`,
         mockEpisodes,

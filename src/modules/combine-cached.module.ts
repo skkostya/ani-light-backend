@@ -7,13 +7,16 @@ import * as redisStore from 'cache-manager-redis-store';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
 import { HttpRetryService } from '../common/services/http-retry.service';
 import { ProfanityFilterService } from '../common/services/profanity-filter.service';
-import { AnimeGenreService } from './anime/anime-genre.service';
-import { AnimeRatingController } from './anime/anime-rating.controller';
-import { AnimeRatingService } from './anime/anime-rating.service';
+import { AnimeReleaseGenreService } from './anime-release/anime-release-genre.service';
+import { AnimeReleaseRatingController } from './anime-release/anime-release-rating.controller';
+import { AnimeReleaseRatingService } from './anime-release/anime-release-rating.service';
+import { AnimeReleaseController } from './anime-release/anime-release.controller';
+import { AnimeReleaseService } from './anime-release/anime-release.service';
+import { AnimeGenre } from './anime-release/entities/anime-release-genre.entity';
+import { AnimeRating } from './anime-release/entities/anime-release-rating.entity';
+import { AnimeRelease } from './anime-release/entities/anime-release.entity';
 import { AnimeController } from './anime/anime.controller';
 import { AnimeService } from './anime/anime.service';
-import { AnimeGenre } from './anime/entities/anime-genre.entity';
-import { AnimeRating } from './anime/entities/anime-rating.entity';
 import { Anime } from './anime/entities/anime.entity';
 import { AgeRating } from './dictionaries/entities/age-rating.entity';
 import { Genre } from './dictionaries/entities/genre.entity';
@@ -41,6 +44,7 @@ import { UserService } from './user/user.service';
 
 const ENTITIES = [
   Anime,
+  AnimeRelease,
   AnimeGenre,
   AnimeRating,
   Episode,
@@ -58,14 +62,15 @@ const SERVICES = [
   AgeRatingService,
   GenreService,
   AnimeService,
-  AnimeGenreService,
+  AnimeReleaseService,
+  AnimeReleaseGenreService,
   EpisodeService,
   UserService,
   UserAnimeService,
   UserEpisodeService,
   EpisodeCommentService,
   EpisodeRatingService,
-  AnimeRatingService,
+  AnimeReleaseRatingService,
   ProfanityFilterService,
   HttpRetryService,
   SecurityAuditService,
@@ -73,13 +78,14 @@ const SERVICES = [
 
 const CONTROLLERS = [
   AnimeController,
+  AnimeReleaseController,
   EpisodeController,
   UserAnimeController,
   UserEpisodeController,
   UserNotificationsController,
   EpisodeCommentController,
   EpisodeRatingController,
-  AnimeRatingController,
+  AnimeReleaseRatingController,
 ];
 
 @Module({

@@ -47,7 +47,7 @@ export class Episode1756708507400 implements MigrationInterface {
       'episode',
       new TableForeignKey({
         columnNames: ['anime_id'],
-        referencedTableName: 'anime',
+        referencedTableName: 'anime_release',
         referencedColumnNames: ['id'],
         onDelete: 'CASCADE',
       }),

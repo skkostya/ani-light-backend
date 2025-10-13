@@ -8,11 +8,11 @@ import { Repository } from 'typeorm';
 import {
   CreateAnimeRatingDto,
   UpdateAnimeRatingDto,
-} from './dto/anime-rating.dto';
-import { AnimeRating } from './entities/anime-rating.entity';
+} from './dto/anime-release-rating.dto';
+import { AnimeRating } from './entities/anime-release-rating.entity';
 
 @Injectable()
-export class AnimeRatingService {
+export class AnimeReleaseRatingService {
   constructor(
     @InjectRepository(AnimeRating)
     private ratingRepository: Repository<AnimeRating>,

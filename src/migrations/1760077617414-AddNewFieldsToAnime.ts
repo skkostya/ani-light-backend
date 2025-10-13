@@ -1,10 +1,12 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
+export class AddNewFieldsToAnimeRelease1760077617414
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Добавление новых полей в таблицу anime
+    // Добавление новых полей в таблицу anime_release_release
     await queryRunner.addColumn(
-      'anime',
+      'anime_release_release',
       new TableColumn({
         name: 'alias',
         type: 'varchar',
@@ -13,7 +15,7 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
     );
 
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'is_blocked_by_geo',
         type: 'boolean',
@@ -23,7 +25,7 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
     );
 
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'is_ongoing',
         type: 'boolean',
@@ -33,7 +35,7 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
     );
 
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'publish_day',
         type: 'jsonb',
@@ -42,7 +44,7 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
     );
 
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'episodes_total',
         type: 'integer',
@@ -51,7 +53,7 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
     );
 
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'average_duration_of_episode',
         type: 'integer',
@@ -60,7 +62,7 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
     );
 
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'external_created_at',
         type: 'timestamp',
@@ -71,12 +73,15 @@ export class AddNewFieldsToAnime1760077617414 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Удаление добавленных полей
-    await queryRunner.dropColumn('anime', 'external_created_at');
-    await queryRunner.dropColumn('anime', 'average_duration_of_episode');
-    await queryRunner.dropColumn('anime', 'episodes_total');
-    await queryRunner.dropColumn('anime', 'publish_day');
-    await queryRunner.dropColumn('anime', 'is_ongoing');
-    await queryRunner.dropColumn('anime', 'is_blocked_by_geo');
-    await queryRunner.dropColumn('anime', 'alias');
+    await queryRunner.dropColumn('anime_release', 'external_created_at');
+    await queryRunner.dropColumn(
+      'anime_release',
+      'average_duration_of_episode',
+    );
+    await queryRunner.dropColumn('anime_release', 'episodes_total');
+    await queryRunner.dropColumn('anime_release', 'publish_day');
+    await queryRunner.dropColumn('anime_release', 'is_ongoing');
+    await queryRunner.dropColumn('anime_release', 'is_blocked_by_geo');
+    await queryRunner.dropColumn('anime_release', 'alias');
   }
 }

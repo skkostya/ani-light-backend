@@ -1,6 +1,6 @@
 import { Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Genre } from '../../dictionaries/entities/genre.entity';
-import { Anime } from './anime.entity';
+import { AnimeRelease } from './anime-release.entity';
 
 @Entity('anime_genres')
 export class AnimeGenre {
@@ -10,9 +10,11 @@ export class AnimeGenre {
   @PrimaryColumn('uuid')
   genre_id: string;
 
-  @ManyToOne(() => Anime, (anime) => anime.animeGenres, { onDelete: 'CASCADE' })
+  @ManyToOne(() => AnimeRelease, (animeRelease) => animeRelease.animeGenres, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'anime_id' })
-  anime: Anime;
+  animeRelease: AnimeRelease;
 
   @ManyToOne(() => Genre, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'genre_id' })

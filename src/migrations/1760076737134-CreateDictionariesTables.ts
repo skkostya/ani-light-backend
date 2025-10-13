@@ -70,13 +70,13 @@ export class CreateDictionariesTables1760076737134
       true,
     );
 
-    // Создание таблицы anime_genres для связи many-to-many
+    // Создание таблицы anime_release_genres для связи many-to-many
     await queryRunner.createTable(
       new Table({
-        name: 'anime_genres',
+        name: 'anime_release_genres',
         columns: [
           {
-            name: 'anime_id',
+            name: 'anime_release_id',
             type: 'uuid',
             isPrimary: true,
           },
@@ -88,8 +88,8 @@ export class CreateDictionariesTables1760076737134
         ],
         foreignKeys: [
           {
-            columnNames: ['anime_id'],
-            referencedTableName: 'anime',
+            columnNames: ['anime_release_id'],
+            referencedTableName: 'anime_release_release',
             referencedColumnNames: ['id'],
             onDelete: 'CASCADE',
           },
@@ -104,9 +104,9 @@ export class CreateDictionariesTables1760076737134
       true,
     );
 
-    // Добавление колонки age_rating_id в таблицу anime
+    // Добавление колонки age_rating_id в таблицу anime_release
     await queryRunner.addColumn(
-      'anime',
+      'anime_release',
       new TableColumn({
         name: 'age_rating_id',
         type: 'uuid',
@@ -116,7 +116,7 @@ export class CreateDictionariesTables1760076737134
 
     // Добавление внешнего ключа для age_rating_id
     await queryRunner.createForeignKey(
-      'anime',
+      'anime_release',
       new TableForeignKey({
         columnNames: ['age_rating_id'],
         referencedTableName: 'age_ratings',
@@ -136,37 +136,41 @@ export class CreateDictionariesTables1760076737134
       'CREATE INDEX "IDX_genres_name" ON "genres" ("name")',
     );
     await queryRunner.query(
-      'CREATE INDEX "IDX_anime_genres_anime_id" ON "anime_genres" ("anime_id")',
+      'CREATE INDEX "IDX_anime_release_genres_anime_release_id" ON "anime_release_genres" ("anime_release_id")',
     );
     await queryRunner.query(
-      'CREATE INDEX "IDX_anime_genres_genre_id" ON "anime_genres" ("genre_id")',
+      'CREATE INDEX "IDX_anime_release_genres_genre_id" ON "anime_release_genres" ("genre_id")',
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Удаление индексов
-    await queryRunner.query('DROP INDEX IF EXISTS "IDX_anime_genres_genre_id"');
-    await queryRunner.query('DROP INDEX IF EXISTS "IDX_anime_genres_anime_id"');
+    await queryRunner.query(
+      'DROP INDEX IF EXISTS "IDX_anime_release_genres_genre_id"',
+    );
+    await queryRunner.query(
+      'DROP INDEX IF EXISTS "IDX_anime_release_genres_anime_release_id"',
+    );
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_genres_name"');
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_genres_external_id"');
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_age_ratings_value"');
 
     // Удаление внешнего ключа age_rating_id
-    const animeTable = await queryRunner.getTable('anime');
-    if (animeTable) {
-      const ageRatingForeignKey = animeTable.foreignKeys.find(
+    const anime_releaseTable = await queryRunner.getTable('anime_release');
+    if (anime_releaseTable) {
+      const ageRatingForeignKey = anime_releaseTable.foreignKeys.find(
         (fk) => fk.columnNames.indexOf('age_rating_id') !== -1,
       );
       if (ageRatingForeignKey) {
-        await queryRunner.dropForeignKey('anime', ageRatingForeignKey);
+        await queryRunner.dropForeignKey('anime_release', ageRatingForeignKey);
       }
     }
 
     // Удаление колонки age_rating_id
-    await queryRunner.dropColumn('anime', 'age_rating_id');
+    await queryRunner.dropColumn('anime_release', 'age_rating_id');
 
     // Удаление таблиц
-    await queryRunner.dropTable('anime_genres');
+    await queryRunner.dropTable('anime_release_genres');
     await queryRunner.dropTable('genres');
     await queryRunner.dropTable('age_ratings');
   }

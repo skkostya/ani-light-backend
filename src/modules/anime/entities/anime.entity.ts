@@ -1,104 +1,50 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
-import { AgeRating } from '../../dictionaries/entities/age-rating.entity';
-import { Episode } from '../../episode/entities/episode.entity';
-import { AnimeGenre } from './anime-genre.entity';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { AnimeRelease } from '../../anime-release/entities/anime-release.entity';
+import { UserAnime } from '../../user/entities/user-anime.entity';
 
-// Интерфейсы для типизации связей
-export interface UserAnimeRelation {
-  id: string;
-  user_id: string;
-  anime_id: string;
-  is_favorite: boolean;
-  want_to_watch: boolean;
-  notifications_telegram: boolean;
-  notifications_email: boolean;
-  rating?: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface AnimeRatingRelation {
-  id: string;
-  user_id: string;
-  anime_id: string;
-  rating: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-@Entity()
+@Entity('anime')
 export class Anime {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ nullable: true })
-  external_id?: number; // Для связи с AniLibria API ID
+  @Column({ nullable: true, unique: true })
+  external_id?: string;
 
   @Column()
-  title_ru: string;
+  name: string;
 
   @Column()
-  title_en: string;
-
-  @Column('text')
-  description: string;
+  name_english: string;
 
   @Column({ nullable: true })
-  age_rating_id?: string;
+  image?: string;
 
-  @Column()
-  year: number;
-
-  @Column()
-  poster_url: string;
-
-  // Новые поля из AniLibria API
-  @Column({ nullable: true })
-  alias?: string;
-
-  @Column({ default: false })
-  is_blocked_by_geo: boolean;
-
-  @Column({ default: false })
-  is_ongoing: boolean;
-
-  @Column('jsonb', { nullable: true })
-  publish_day?: {
-    value: number;
-    description: string;
-  };
+  @Column({ type: 'decimal', precision: 3, scale: 2, nullable: true })
+  rating?: number;
 
   @Column({ nullable: true })
-  episodes_total?: number;
+  last_year?: number;
 
   @Column({ nullable: true })
-  average_duration_of_episode?: number;
+  first_year?: number;
+
+  @Column({ default: 0 })
+  total_releases: number;
+
+  @Column({ default: 0 })
+  total_episodes: number;
 
   @Column({ nullable: true })
-  external_created_at?: Date;
+  total_duration?: string;
 
-  @OneToMany(() => Episode, (episode) => episode.anime)
-  @JoinColumn()
-  episodes: Episode[];
+  @Column({ default: 0 })
+  total_duration_in_seconds: number;
 
-  @OneToMany('UserAnime', 'anime')
-  userAnime: UserAnimeRelation[];
+  // Связь с anime-release (один anime может иметь много anime-release)
+  @OneToMany(() => AnimeRelease, (animeRelease) => animeRelease.anime)
+  animeReleases: AnimeRelease[];
 
-  @OneToMany('AnimeRating', 'anime')
-  ratings: AnimeRatingRelation[];
-
-  // Связи с справочниками
-  @ManyToOne(() => AgeRating, { nullable: true })
-  @JoinColumn({ name: 'age_rating_id' })
-  ageRating?: AgeRating;
-
-  @OneToMany(() => AnimeGenre, (animeGenre) => animeGenre.anime)
-  animeGenres: AnimeGenre[];
+  // Связь с user-anime (один anime может быть связан с многими пользователями)
+  @OneToMany(() => UserAnime, (userAnime) => userAnime.anime)
+  userAnime: UserAnime[];
 }

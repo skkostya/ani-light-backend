@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AnimeGenre } from './entities/anime-genre.entity';
+import { AnimeGenre } from './entities/anime-release-genre.entity';
 
 @Injectable()
-export class AnimeGenreService {
+export class AnimeReleaseGenreService {
   constructor(
     @InjectRepository(AnimeGenre)
     private animeGenreRepository: Repository<AnimeGenre>,

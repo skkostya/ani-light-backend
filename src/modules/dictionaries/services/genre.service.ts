@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import {
   AniLibriaAnime,
   AniLibriaGenre,
-} from '../../anime/types/anilibria-api.types';
+} from '../../anime-release/types/anilibria-api.types';
 import { CreateGenreDto, UpdateGenreDto } from '../dto/genre.dto';
 import { Genre } from '../entities/genre.entity';
 

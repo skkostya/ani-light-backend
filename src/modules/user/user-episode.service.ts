@@ -78,7 +78,7 @@ export class UserEpisodeService {
   async findByUser(userId: string): Promise<UserEpisode[]> {
     return this.userEpisodeRepository.find({
       where: { user_id: userId },
-      relations: ['episode', 'episode.anime'],
+      relations: ['episode', 'episode.animeRelease'],
       order: { created_at: 'DESC' },
     });
   }
@@ -94,7 +94,7 @@ export class UserEpisodeService {
   async getWatchedEpisodes(userId: string): Promise<UserEpisode[]> {
     return this.userEpisodeRepository.find({
       where: { user_id: userId, status: EpisodeWatchStatus.WATCHED },
-      relations: ['episode', 'episode.anime'],
+      relations: ['episode', 'episode.animeRelease'],
       order: { watched_until_end_at: 'DESC' },
     });
   }
@@ -102,7 +102,7 @@ export class UserEpisodeService {
   async getWatchingEpisodes(userId: string): Promise<UserEpisode[]> {
     return this.userEpisodeRepository.find({
       where: { user_id: userId, status: EpisodeWatchStatus.WATCHING },
-      relations: ['episode', 'episode.anime'],
+      relations: ['episode', 'episode.animeRelease'],
       order: { last_watched_at: 'DESC' },
     });
   }

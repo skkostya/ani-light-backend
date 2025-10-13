@@ -9,9 +9,9 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
-import { Anime } from './anime.entity';
+import { AnimeRelease } from './anime-release.entity';
 
-@Entity()
+@Entity('anime_rating')
 @Index(['user_id', 'anime_id'], { unique: true })
 export class AnimeRating {
   @PrimaryGeneratedColumn('uuid')
@@ -24,9 +24,9 @@ export class AnimeRating {
   @Column('uuid')
   user_id: string;
 
-  @ManyToOne(() => Anime, (anime) => anime.ratings)
+  @ManyToOne(() => AnimeRelease, (animeRelease) => animeRelease.ratings)
   @JoinColumn({ name: 'anime_id' })
-  anime: Anime;
+  animeRelease: AnimeRelease;
 
   @Column('uuid')
   anime_id: string;
