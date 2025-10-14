@@ -382,7 +382,7 @@ export class UserRelationships1760063795540 implements MigrationInterface {
     await queryRunner.query(`
             ALTER TABLE "user_anime" 
             ADD CONSTRAINT "FK_user_anime_anime_id" 
-            FOREIGN KEY ("anime_id") REFERENCES "anime"("id") ON DELETE CASCADE
+            FOREIGN KEY ("anime_id") REFERENCES "anime_release"("id") ON DELETE CASCADE
         `);
 
     await queryRunner.query(`

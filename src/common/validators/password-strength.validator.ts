@@ -1,6 +1,5 @@
 import {
   registerDecorator,
-  ValidationArguments,
   ValidationOptions,
   ValidatorConstraint,
   ValidatorConstraintInterface,
@@ -10,7 +9,7 @@ import {
 export class IsStrongPasswordConstraint
   implements ValidatorConstraintInterface
 {
-  validate(password: string, args: ValidationArguments) {
+  validate(password: string) {
     if (!password) return false;
 
     // Минимальная длина 8 символов
@@ -26,7 +25,7 @@ export class IsStrongPasswordConstraint
     if (!/\d/.test(password)) return false;
 
     // Должен содержать хотя бы один специальный символ
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) return false;
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) return false;
 
     // Не должен содержать пробелы
     if (/\s/.test(password)) return false;
@@ -34,7 +33,7 @@ export class IsStrongPasswordConstraint
     return true;
   }
 
-  defaultMessage(args: ValidationArguments) {
+  defaultMessage() {
     return 'Пароль должен содержать минимум 8 символов, включая заглавные и строчные буквы, цифры и специальные символы, без пробелов';
   }
 }

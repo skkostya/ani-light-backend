@@ -2,7 +2,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -10,7 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
-import { CommentReaction } from './comment-reaction.entity';
+import { CommentReaction, ReactionType } from './comment-reaction.entity';
 import { Episode } from './episode.entity';
 
 @Entity()
@@ -63,13 +62,15 @@ export class EpisodeComment {
   // Виртуальные поля для подсчета реакций
   get likesCount(): number {
     return (
-      this.reactions?.filter((r) => r.reaction_type === 'like').length || 0
+      this.reactions?.filter((r) => r.reaction_type === ReactionType.LIKE)
+        .length || 0
     );
   }
 
   get dislikesCount(): number {
     return (
-      this.reactions?.filter((r) => r.reaction_type === 'dislike').length || 0
+      this.reactions?.filter((r) => r.reaction_type === ReactionType.DISLIKE)
+        .length || 0
     );
   }
 }

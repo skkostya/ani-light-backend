@@ -28,7 +28,7 @@ export class MetricsInterceptor implements NestInterceptor {
 
     const method = request.method;
     const route = request.route?.path || request.url;
-    const startTime = Date.now();
+    // const startTime = Date.now(); // Не используется, но может быть полезно для отладки
 
     // Увеличиваем счетчик активных соединений
     this.activeConnections.inc();

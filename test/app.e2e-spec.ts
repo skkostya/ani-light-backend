@@ -125,12 +125,6 @@ describe('API E2E Tests', () => {
   });
 
   describe('Authentication API', () => {
-    const testUser = {
-      email: 'test@example.com',
-      username: 'testuser',
-      password: 'password123',
-    };
-
     it('/auth/register (POST) should validate input data', () => {
       return request(app.getHttpServer())
         .post('/auth/register')

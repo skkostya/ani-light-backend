@@ -89,7 +89,7 @@ export class CreateDictionariesTables1760076737134
         foreignKeys: [
           {
             columnNames: ['anime_release_id'],
-            referencedTableName: 'anime_release_release',
+            referencedTableName: 'anime_release',
             referencedColumnNames: ['id'],
             onDelete: 'CASCADE',
           },

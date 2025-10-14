@@ -1,14 +1,12 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { CreateUserAnimeDto, UpdateUserAnimeDto } from './dto/user-anime.dto';
 import { UserAnime } from './entities/user-anime.entity';
 import { UserAnimeService } from './user-anime.service';
 
 describe('UserAnimeService', () => {
   let service: UserAnimeService;
-  let repository: Repository<UserAnime>;
 
   const mockRepository = {
     create: jest.fn(),
@@ -30,9 +28,6 @@ describe('UserAnimeService', () => {
     }).compile();
 
     service = module.get<UserAnimeService>(UserAnimeService);
-    repository = module.get<Repository<UserAnime>>(
-      getRepositoryToken(UserAnime),
-    );
   });
 
   afterEach(() => {

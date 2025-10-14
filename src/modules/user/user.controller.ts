@@ -7,23 +7,11 @@ import {
   Response,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiCookieAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response as ExpressResponse } from 'express';
 import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
-import {
-  CreateTelegramUserDto,
-  CreateUserDto,
-  LoginDto,
-  UserResponseDto,
-} from './dto/user.dto';
+import { CreateTelegramUserDto, CreateUserDto, LoginDto } from './dto/user.dto';
 import { UserService } from './user.service';
 
 @ApiTags('auth')

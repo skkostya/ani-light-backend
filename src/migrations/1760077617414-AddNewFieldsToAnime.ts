@@ -4,9 +4,9 @@ export class AddNewFieldsToAnimeRelease1760077617414
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Добавление новых полей в таблицу anime_release_release
+    // Добавление новых полей в таблицу anime_release
     await queryRunner.addColumn(
-      'anime_release_release',
+      'anime_release',
       new TableColumn({
         name: 'alias',
         type: 'varchar',

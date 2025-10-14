@@ -16,13 +16,11 @@ import { AnimeRelease } from './entities/anime-release.entity';
 describe('AnimeReleaseService', () => {
   let service: AnimeReleaseService;
   let animeReleaseRepository: jest.Mocked<Repository<AnimeRelease>>;
-  let episodeRepository: jest.Mocked<Repository<Episode>>;
   let cacheManager: jest.Mocked<any>;
   let httpRetryService: jest.Mocked<HttpRetryService>;
   let ageRatingService: jest.Mocked<AgeRatingService>;
   let genreService: jest.Mocked<GenreService>;
   let episodeService: jest.Mocked<EpisodeService>;
-  let animeReleaseGenreService: jest.Mocked<AnimeReleaseGenreService>;
 
   const mockAnime: Partial<AnimeRelease> = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -129,13 +127,11 @@ describe('AnimeReleaseService', () => {
 
     service = module.get<AnimeReleaseService>(AnimeReleaseService);
     animeReleaseRepository = module.get(getRepositoryToken(AnimeRelease));
-    episodeRepository = module.get(getRepositoryToken(Episode));
     cacheManager = module.get(CACHE_MANAGER);
     httpRetryService = module.get(HttpRetryService);
     ageRatingService = module.get(AgeRatingService);
     genreService = module.get(GenreService);
     episodeService = module.get(EpisodeService);
-    animeReleaseGenreService = module.get(AnimeReleaseGenreService);
   });
 
   it('should be defined', () => {

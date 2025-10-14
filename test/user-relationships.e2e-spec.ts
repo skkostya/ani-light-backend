@@ -26,17 +26,6 @@ import { UserEpisodeService } from '../src/modules/user/user-episode.service';
 
 describe('User Relationships (e2e)', () => {
   let app: INestApplication;
-  let userAnimeService: UserAnimeService;
-  let userEpisodeService: UserEpisodeService;
-  let commentService: EpisodeCommentService;
-  let animeRatingService: AnimeRatingService;
-  let episodeRatingService: EpisodeRatingService;
-
-  const testUser = {
-    id: 'test-user-123',
-    username: 'testuser',
-    email: 'test@example.com',
-  };
 
   const testAnime = {
     id: 'test-anime-123',
@@ -109,17 +98,6 @@ describe('User Relationships (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-
-    userAnimeService = moduleFixture.get<UserAnimeService>(UserAnimeService);
-    userEpisodeService =
-      moduleFixture.get<UserEpisodeService>(UserEpisodeService);
-    commentService = moduleFixture.get<EpisodeCommentService>(
-      EpisodeCommentService,
-    );
-    animeRatingService =
-      moduleFixture.get<AnimeRatingService>(AnimeRatingService);
-    episodeRatingService =
-      moduleFixture.get<EpisodeRatingService>(EpisodeRatingService);
   });
 
   afterAll(async () => {

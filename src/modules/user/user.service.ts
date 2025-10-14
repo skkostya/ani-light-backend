@@ -123,8 +123,7 @@ export class UserService {
   async registerTelegramUser(
     createTelegramUserDto: CreateTelegramUserDto,
   ): Promise<{ user: UserResponseDto; access_token: string }> {
-    const { telegram_id, username, first_name, last_name, photo_url } =
-      createTelegramUserDto;
+    const { telegram_id, username } = createTelegramUserDto;
 
     // Проверяем, не существует ли уже пользователь с таким telegram_id
     const existingUser = await this.findByTelegramId(telegram_id);
