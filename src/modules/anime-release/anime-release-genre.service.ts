@@ -12,12 +12,12 @@ export class AnimeReleaseGenreService {
 
   async updateAnimeGenres(animeId: string, genreIds: string[]): Promise<void> {
     // Удаляем существующие связи
-    await this.animeGenreRepository.delete({ anime_id: animeId });
+    await this.animeGenreRepository.delete({ anime_release_id: animeId });
 
     // Создаем новые связи
     for (const genreId of genreIds) {
       const animeGenre = this.animeGenreRepository.create({
-        anime_id: animeId,
+        anime_release_id: animeId,
         genre_id: genreId,
       });
       await this.animeGenreRepository.save(animeGenre);
@@ -30,7 +30,7 @@ export class AnimeReleaseGenreService {
 
   async getAnimeGenres(animeId: string): Promise<AnimeGenre[]> {
     return await this.animeGenreRepository.find({
-      where: { anime_id: animeId },
+      where: { anime_release_id: animeId },
       relations: ['genre'],
     });
   }

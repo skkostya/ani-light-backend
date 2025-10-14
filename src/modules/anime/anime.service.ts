@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { AniLibriaFranchiseResponse } from '../anime-release/types/anilibria-api.types';
+import { UserAnime } from '../user/entities/user-anime.entity';
 import { ExternalApiAnimeDto, GetAnimeListDto } from './dto/anime.dto';
 import { Anime } from './entities/anime.entity';
 
@@ -16,6 +17,8 @@ export class AnimeService {
   constructor(
     @InjectRepository(Anime)
     private animeRepository: Repository<Anime>,
+    @InjectRepository(UserAnime)
+    private userAnimeRepository: Repository<UserAnime>,
     private readonly configService: ConfigService,
     private readonly httpRetryService: HttpRetryService,
   ) {
@@ -28,7 +31,7 @@ export class AnimeService {
 
       // Получаем данные с внешнего API
       const response = await this.httpRetryService.get<ExternalApiAnimeDto[]>(
-        `${this.apiUrl}/anime/franchise`,
+        `${this.apiUrl}/anime/franchises`,
       );
 
       const externalAnimeList = response.data;
@@ -167,25 +170,23 @@ export class AnimeService {
   }
 
   async findOne(id: string, userId?: string): Promise<Anime> {
-    const relations = ['animeReleases'];
+    const qb = this.animeRepository
+      .createQueryBuilder('anime')
+      .leftJoinAndSelect('anime.animeReleases', 'animeReleases')
+      .where('anime.id = :id', { id });
 
-    // Добавляем связь userAnime для текущего пользователя, если он авторизован
-    if (userId) {
-      relations.push('userAnime');
-    }
-
-    const anime = await this.animeRepository.findOne({
-      where: { id },
-      relations,
-    });
+    const anime = await qb.getOne();
 
     if (!anime) {
       throw new NotFoundException(`Anime with ID ${id} not found`);
     }
 
-    // Если пользователь авторизован, фильтруем userAnime только для текущего пользователя
-    if (userId && anime.userAnime) {
-      anime.userAnime = anime.userAnime.filter((ua) => ua.user_id === userId);
+    // Если пользователь авторизован, загружаем связь userAnime отдельно
+    if (userId) {
+      const userAnime = await this.userAnimeRepository.find({
+        where: { anime_id: id, user_id: userId },
+      });
+      anime.userAnime = userAnime;
     }
 
     return anime;
@@ -449,34 +450,126 @@ export class AnimeService {
    * Получает все релизы аниме с полной информацией
    */
   async getAnimeReleases(id: string, userId?: string): Promise<Anime> {
-    const relations = [
-      'animeReleases',
-      'animeReleases.episodes',
-      'animeReleases.ageRating',
-      'animeReleases.animeGenres',
-      'animeReleases.animeGenres.genre',
-      'animeReleases.ratings',
-    ];
+    const qb = this.animeRepository
+      .createQueryBuilder('anime')
+      .leftJoinAndSelect('anime.animeReleases', 'animeReleases')
+      .leftJoinAndSelect('animeReleases.episodes', 'episodes')
+      .leftJoinAndSelect('animeReleases.ageRating', 'ageRating')
+      .leftJoinAndSelect('animeReleases.animeGenres', 'animeGenres')
+      .leftJoinAndSelect('animeGenres.genre', 'genre')
+      .where('anime.id = :id', { id });
 
-    // Добавляем связь userAnime для текущего пользователя, если он авторизован
-    if (userId) {
-      relations.push('userAnime');
-    }
-
-    const anime = await this.animeRepository.findOne({
-      where: { id },
-      relations,
-    });
+    const anime = await qb.getOne();
 
     if (!anime) {
       throw new NotFoundException(`Anime with ID ${id} not found`);
     }
 
-    // Если пользователь авторизован, фильтруем userAnime только для текущего пользователя
-    if (userId && anime.userAnime) {
-      anime.userAnime = anime.userAnime.filter((ua) => ua.user_id === userId);
+    // Если пользователь авторизован, загружаем связь userAnime отдельно
+    if (userId) {
+      const userAnime = await this.userAnimeRepository.find({
+        where: { anime_id: id, user_id: userId },
+      });
+      anime.userAnime = userAnime;
     }
 
     return anime;
+  }
+
+  /**
+   * Создает anime из данных API релиза
+   */
+  async createFromApiReleaseData(apiAnime: any): Promise<Anime> {
+    const animeData = this.mapApiReleaseDataToAnime(apiAnime);
+    const anime = this.animeRepository.create(animeData);
+    return this.animeRepository.save(anime);
+  }
+
+  /**
+   * Обновляет существующее anime данными из API релиза
+   */
+  async updateFromApiReleaseData(
+    existingAnime: Anime,
+    apiAnime: any,
+  ): Promise<Anime> {
+    // Обновляем год, если текущий релиз новее
+    if (
+      apiAnime.year &&
+      (!existingAnime.last_year || apiAnime.year > existingAnime.last_year)
+    ) {
+      existingAnime.last_year = apiAnime.year;
+    }
+    if (
+      apiAnime.year &&
+      (!existingAnime.first_year || apiAnime.year < existingAnime.first_year)
+    ) {
+      existingAnime.first_year = apiAnime.year;
+    }
+
+    // Обновляем общее количество релизов
+    existingAnime.total_releases = (existingAnime.total_releases || 0) + 1;
+
+    // Обновляем общее количество эпизодов
+    if (apiAnime.episodes_total) {
+      existingAnime.total_episodes =
+        (existingAnime.total_episodes || 0) + apiAnime.episodes_total;
+    }
+
+    // Обновляем изображение, если его еще нет
+    if (
+      !existingAnime.image &&
+      (apiAnime.poster?.optimized?.preview || apiAnime.poster?.preview)
+    ) {
+      existingAnime.image =
+        apiAnime.poster?.optimized?.preview || apiAnime.poster?.preview;
+    }
+
+    return this.animeRepository.save(existingAnime);
+  }
+
+  /**
+   * Ищет anime по названию (русскому или английскому)
+   */
+  async findByName(nameRu?: string, nameEn?: string): Promise<Anime | null> {
+    if (!nameRu && !nameEn) return null;
+
+    const queryBuilder = this.animeRepository.createQueryBuilder('anime');
+
+    if (nameRu && nameEn) {
+      queryBuilder.where(
+        'anime.name ILIKE :nameRu OR anime.name_english ILIKE :nameEn',
+        { nameRu: `%${nameRu}%`, nameEn: `%${nameEn}%` },
+      );
+    } else if (nameRu) {
+      queryBuilder.where('anime.name ILIKE :nameRu', {
+        nameRu: `%${nameRu}%`,
+      });
+    } else if (nameEn) {
+      queryBuilder.where('anime.name_english ILIKE :nameEn', {
+        nameEn: `%${nameEn}%`,
+      });
+    }
+
+    return queryBuilder.getOne();
+  }
+
+  /**
+   * Маппит данные API релиза в формат сущности Anime
+   */
+  private mapApiReleaseDataToAnime(apiAnime: any): Partial<Anime> {
+    return {
+      external_id: apiAnime.id.toString(),
+      name: apiAnime.name?.main || '',
+      name_english: apiAnime.name?.english || '',
+      image:
+        apiAnime.poster?.optimized?.preview ||
+        apiAnime.poster?.preview ||
+        undefined,
+      first_year: apiAnime.year,
+      last_year: apiAnime.year,
+      total_releases: 1,
+      total_episodes: apiAnime.episodes_total || 0,
+      total_duration_in_seconds: 0,
+    };
   }
 }

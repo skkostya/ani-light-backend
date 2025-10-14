@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { AnimeRelease } from '../../anime-release/entities/anime-release.entity';
 
 @Entity('age_ratings')
 export class AgeRating {
@@ -13,4 +14,8 @@ export class AgeRating {
 
   @Column('text')
   description: string; // Описание ограничения по возрасту
+
+  // Обратная связь с anime-release
+  @OneToMany(() => AnimeRelease, (animeRelease) => animeRelease.ageRating)
+  animeReleases: AnimeRelease[];
 }

@@ -352,8 +352,11 @@ export class AnimeReleaseService {
         );
         const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
 
+        // Синхронизируем с основной таблицей anime
+        const anime = await this.syncAnimeFromApiData(apiAnime);
+
         // Создаем новое аниме
-        const anime = this.animeReleaseRepo.create({
+        const animeRelease = this.animeReleaseRepo.create({
           external_id: apiAnime.id,
           title_ru: apiAnime.name?.main || '',
           title_en: apiAnime.name?.english || '',
@@ -379,16 +382,51 @@ export class AnimeReleaseService {
             ? new Date(apiAnime.created_at)
             : undefined,
           age_rating_id: ageRatingId,
+          anime_id: anime.id, // Привязываем к основной таблице anime
         });
 
-        await this.animeReleaseRepo.save(anime);
-        await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
+        await this.animeReleaseRepo.save(animeRelease);
+        await this.animeGenreService.updateAnimeGenres(
+          animeRelease.id,
+          genreIds,
+        );
 
-        console.log(`Synced new anime from API: ${anime.title_ru}`);
+        console.log(`Synced new anime from API: ${animeRelease.title_ru}`);
       }
     } catch (error) {
       console.error(`Error syncing anime ${apiAnime.id} from API:`, error);
     }
+  }
+
+  /**
+   * Синхронизирует anime-release с основной таблицей anime
+   * Использует правильную архитектуру через AnimeService
+   */
+  private async syncAnimeFromApiData(apiAnime: AniLibriaAnime) {
+    // Сначала пытаемся найти anime по external_id
+    let anime = await this.animeService.findOneByExternalId(
+      apiAnime.id.toString(),
+    );
+
+    if (!anime) {
+      // Если не найден по external_id, пытаемся найти по названию
+      anime = await this.animeService.findByName(
+        apiAnime.name?.main,
+        apiAnime.name?.english,
+      );
+    }
+
+    if (!anime) {
+      // Если anime не существует, создаем его используя AnimeService
+      anime = await this.animeService.createFromApiReleaseData(apiAnime);
+      console.log(`Created new anime: ${anime.name}`);
+    } else {
+      // Если anime существует, обновляем его данные
+      anime = await this.animeService.updateFromApiReleaseData(anime, apiAnime);
+      console.log(`Updated existing anime: ${anime.name}`);
+    }
+
+    return anime;
   }
 
   async getAnimeDetails(id: string, userId?: string) {

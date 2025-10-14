@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { AnimeGenre } from '../../anime-release/entities/anime-release-genre.entity';
 
 @Entity('genres')
 export class Genre {
@@ -16,4 +17,8 @@ export class Genre {
     optimized_preview: string;
     preview: string;
   };
+
+  // Обратная связь с anime-release через anime-release-genre
+  @OneToMany(() => AnimeGenre, (animeGenre) => animeGenre.genre)
+  animeGenres: AnimeGenre[];
 }

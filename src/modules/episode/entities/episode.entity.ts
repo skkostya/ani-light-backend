@@ -48,7 +48,7 @@ export class Episode {
   id: string;
 
   @ManyToOne(() => AnimeRelease, (animeRelease) => animeRelease.episodes)
-  @JoinColumn({ name: 'anime_id' })
+  @JoinColumn({ name: 'anime_release_id' })
   animeRelease: AnimeRelease;
 
   @Column()
@@ -92,7 +92,7 @@ export class Episode {
   preview_image?: string;
 
   @Column('uuid')
-  anime_id: string;
+  anime_release_id: string;
 
   @OneToMany('UserEpisode', 'episode')
   userEpisodes: UserEpisodeRelation[];
