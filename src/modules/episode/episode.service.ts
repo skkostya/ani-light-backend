@@ -41,18 +41,24 @@ export class EpisodeService {
       if (!anime)
         throw new NotFoundException(`Anime with ID ${animeId} not found`);
 
-      const relations = ['animeRelease'];
+      // Создаем QueryBuilder
+      const qb = this.episodeRepository
+        .createQueryBuilder('episode')
+        .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
+        .where('animeRelease.id = :animeId', { animeId })
+        .orderBy('episode.number', 'ASC');
 
-      // Если есть авторизованный пользователь, добавляем связь userEpisodes
+      // Если есть авторизованный пользователь, добавляем связь userEpisodes с фильтрацией
       if (userId) {
-        relations.push('userEpisodes');
+        qb.leftJoinAndSelect(
+          'episode.userEpisodes',
+          'userEpisodes',
+          'userEpisodes.user_id = :userId',
+          { userId },
+        );
       }
 
-      episodes = await this.episodeRepository.find({
-        where: { animeRelease: { id: animeId } },
-        relations,
-        order: { number: 'ASC' },
-      });
+      episodes = await qb.getMany();
 
       if (!episodes.length && anime.external_id) {
         const data = await this.fetchFromApi<AniLibriaAnime>(
@@ -77,12 +83,26 @@ export class EpisodeService {
           } as Partial<Episode>);
           await this.episodeRepository.save(episode);
         }
-        episodes = await this.episodeRepository.find({
-          where: { animeRelease: { id: animeId } },
-          relations,
-          order: { number: 'ASC' },
-        });
+
+        // После создания эпизодов, загружаем их снова с правильными связями
+        const newQb = this.episodeRepository
+          .createQueryBuilder('episode')
+          .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
+          .where('animeRelease.id = :animeId', { animeId })
+          .orderBy('episode.number', 'ASC');
+
+        if (userId) {
+          newQb.leftJoinAndSelect(
+            'episode.userEpisodes',
+            'userEpisodes',
+            'userEpisodes.user_id = :userId',
+            { userId },
+          );
+        }
+
+        episodes = await newQb.getMany();
       }
+
       await this.cacheManager.set(cacheKey, episodes, 3600);
     }
     return episodes;
@@ -92,20 +112,26 @@ export class EpisodeService {
     const cacheKey = `episode_${id}_${userId || 'anonymous'}`;
     let episode = await this.cacheManager.get<Episode>(cacheKey);
     if (!episode) {
-      const relations = ['animeRelease'];
+      // Создаем QueryBuilder
+      const qb = this.episodeRepository
+        .createQueryBuilder('episode')
+        .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
+        .where('episode.id = :id', { id });
 
-      // Если есть авторизованный пользователь, добавляем связь userEpisodes
+      // Если есть авторизованный пользователь, добавляем связь userEpisodes с фильтрацией
       if (userId) {
-        relations.push('userEpisodes');
+        qb.leftJoinAndSelect(
+          'episode.userEpisodes',
+          'userEpisodes',
+          'userEpisodes.user_id = :userId',
+          { userId },
+        );
       }
 
-      episode =
-        (await this.episodeRepository.findOne({
-          where: { id },
-          relations,
-        })) || undefined;
+      episode = (await qb.getOne()) || undefined;
       if (!episode)
         throw new NotFoundException(`Episode with ID ${id} not found`);
+
       await this.cacheManager.set(cacheKey, episode, 3600);
     }
     return episode;
@@ -119,22 +145,24 @@ export class EpisodeService {
     const cacheKey = `episode_anime_${animeId}_number_${episodeNumber}_${userId || 'anonymous'}`;
     let episode = await this.cacheManager.get<Episode>(cacheKey);
     if (!episode) {
-      const relations = ['animeRelease'];
+      // Создаем QueryBuilder
+      const qb = this.episodeRepository
+        .createQueryBuilder('episode')
+        .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
+        .where('animeRelease.id = :animeId', { animeId })
+        .andWhere('episode.number = :episodeNumber', { episodeNumber });
 
-      // Если есть авторизованный пользователь, добавляем связь userEpisodes
+      // Если есть авторизованный пользователь, добавляем связь userEpisodes с фильтрацией
       if (userId) {
-        relations.push('userEpisodes');
+        qb.leftJoinAndSelect(
+          'episode.userEpisodes',
+          'userEpisodes',
+          'userEpisodes.user_id = :userId',
+          { userId },
+        );
       }
 
-      episode =
-        (await this.episodeRepository.findOne({
-          where: {
-            animeRelease: { id: animeId },
-            number: episodeNumber,
-          },
-          relations,
-        })) ?? undefined;
-
+      episode = (await qb.getOne()) || undefined;
       if (!episode) {
         throw new NotFoundException(
           `Episode with number ${episodeNumber} for anime ${animeId} not found`,
