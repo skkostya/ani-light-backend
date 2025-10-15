@@ -453,7 +453,6 @@ export class AnimeService {
     const qb = this.animeRepository
       .createQueryBuilder('anime')
       .leftJoinAndSelect('anime.animeReleases', 'animeReleases')
-      .leftJoinAndSelect('animeReleases.episodes', 'episodes')
       .leftJoinAndSelect('animeReleases.ageRating', 'ageRating')
       .leftJoinAndSelect('animeReleases.animeGenres', 'animeGenres')
       .leftJoinAndSelect('animeGenres.genre', 'genre')

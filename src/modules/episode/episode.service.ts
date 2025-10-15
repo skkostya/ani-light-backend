@@ -60,14 +60,15 @@ export class EpisodeService {
 
       episodes = await qb.getMany();
 
-      if (!episodes.length && anime.external_id) {
+      if (episodes.length !== anime.episodes_total && anime.external_id) {
         const data = await this.fetchFromApi<AniLibriaAnime>(
           `/anime/releases/${anime.external_id}`,
         );
         for (const ep of data.episodes) {
           const episode = this.episodeRepository.create({
             id: uuidv4(),
-            anime,
+            anime_release_id: anime.id,
+            animeRelease: anime,
             number: ep.sort_order,
             video_url:
               this.cleanVideoUrl(ep.hls_1080 || ep.hls_720 || ep.hls_480) || '',
@@ -192,6 +193,7 @@ export class EpisodeService {
 
     // Создаем новый эпизод
     const newEpisode = this.episodeRepository.create({
+      anime_release_id: animeRelease.id,
       animeRelease: animeRelease,
       number: episode.ordinal || episode.sort_order,
       video_url:

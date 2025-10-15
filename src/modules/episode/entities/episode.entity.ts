@@ -47,6 +47,9 @@ export class Episode {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column('uuid')
+  anime_release_id: string;
+
   @ManyToOne(() => AnimeRelease, (animeRelease) => animeRelease.episodes)
   @JoinColumn({ name: 'anime_release_id' })
   animeRelease: AnimeRelease;
@@ -90,9 +93,6 @@ export class Episode {
   // Превью изображение эпизода
   @Column({ nullable: true })
   preview_image?: string;
-
-  @Column('uuid')
-  anime_release_id: string;
 
   @OneToMany('UserEpisode', 'episode')
   userEpisodes: UserEpisodeRelation[];
