@@ -65,6 +65,14 @@ export class EpisodeService {
           `/anime/releases/${anime.external_id}`,
         );
         for (const ep of data.episodes) {
+          const existingEpisode = await this.episodeRepository.findOne({
+            where: {
+              animeRelease: { id: anime.id },
+              number: ep.sort_order,
+            },
+          });
+          if (existingEpisode) continue;
+
           const episode = this.episodeRepository.create({
             id: uuidv4(),
             anime_release_id: anime.id,
