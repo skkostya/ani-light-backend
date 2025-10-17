@@ -139,3 +139,62 @@ export class UserEpisodeResponseDto {
   })
   updated_at: Date;
 }
+
+export class UserEpisodeWithAnimeInfoResponseDto extends UserEpisodeResponseDto {
+  @ApiProperty({
+    description: 'Информация об эпизоде с дополнительными полями',
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        format: 'uuid',
+        description: 'ID эпизода',
+        example: 'episode-uuid',
+      },
+      anime_release_id: {
+        type: 'string',
+        format: 'uuid',
+        description: 'ID релиза аниме',
+        example: 'anime-release-uuid',
+      },
+      anime_id: {
+        type: 'string',
+        format: 'uuid',
+        description: 'ID аниме',
+        example: 'anime-uuid',
+        nullable: true,
+      },
+      number: {
+        type: 'number',
+        description: 'Номер эпизода',
+        example: 1,
+      },
+      video_url: {
+        type: 'string',
+        description: 'URL видео',
+        example: 'https://example.com/video.mp4',
+      },
+    },
+  })
+  episode: {
+    id: string;
+    anime_release_id: string;
+    anime_id: string | null;
+    number: number;
+    video_url: string;
+    subtitles_url?: string;
+    video_url_480?: string;
+    video_url_720?: string;
+    video_url_1080?: string;
+    opening?: {
+      start: number;
+      stop: number;
+    };
+    ending?: {
+      start: number;
+      stop: number;
+    };
+    duration?: number;
+    preview_image?: string;
+  };
+}

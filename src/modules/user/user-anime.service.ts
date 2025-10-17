@@ -5,7 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateUserAnimeDto, UpdateUserAnimeDto } from './dto/user-anime.dto';
+import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
+import {
+  CreateUserAnimeDto,
+  GetUserAnimeListDto,
+  PaginatedUserAnimeResponseDto,
+  UpdateUserAnimeDto,
+} from './dto/user-anime.dto';
 import { UserAnime } from './entities/user-anime.entity';
 
 @Injectable()
@@ -82,20 +88,50 @@ export class UserAnimeService {
     });
   }
 
-  async getFavorites(userId: string): Promise<UserAnime[]> {
-    return this.userAnimeRepository.find({
+  async getFavorites(
+    userId: string,
+    pagination: GetUserAnimeListDto,
+  ): Promise<PaginatedUserAnimeResponseDto> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.userAnimeRepository.findAndCount({
       where: { user_id: userId, is_favorite: true },
       relations: ['anime'],
       order: { created_at: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return new PaginatedResponseDto(
+      data,
+      total,
+      page,
+      limit,
+    ) as PaginatedUserAnimeResponseDto;
   }
 
-  async getWantToWatch(userId: string): Promise<UserAnime[]> {
-    return this.userAnimeRepository.find({
+  async getWantToWatch(
+    userId: string,
+    pagination: GetUserAnimeListDto,
+  ): Promise<PaginatedUserAnimeResponseDto> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.userAnimeRepository.findAndCount({
       where: { user_id: userId, want_to_watch: true },
       relations: ['anime'],
       order: { created_at: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return new PaginatedResponseDto(
+      data,
+      total,
+      page,
+      limit,
+    ) as PaginatedUserAnimeResponseDto;
   }
 
   async remove(userId: string, animeId: string): Promise<void> {

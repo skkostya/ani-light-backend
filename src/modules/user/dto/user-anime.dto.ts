@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
+import {
+  PaginatedResponseDto,
+  PaginationDto,
+} from '../../../common/dto/pagination.dto';
 
 export class CreateUserAnimeDto {
   @ApiProperty({
@@ -169,4 +180,66 @@ export class UserAnimeResponseDto {
     format: 'date-time',
   })
   updated_at: Date;
+}
+
+export class GetUserAnimeListDto extends PaginationDto {
+  @ApiPropertyOptional({
+    description: 'Номер страницы',
+    example: 1,
+    minimum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Количество элементов на странице',
+    example: 20,
+    minimum: 1,
+    maximum: 50,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number = 20;
+}
+
+export class PaginatedUserAnimeResponseDto extends PaginatedResponseDto<UserAnimeResponseDto> {
+  @ApiProperty({
+    description: 'Список связей пользователя с аниме',
+    type: [UserAnimeResponseDto],
+  })
+  declare data: UserAnimeResponseDto[];
+
+  @ApiProperty({
+    description: 'Информация о пагинации',
+    example: {
+      total: 100,
+      page: 1,
+      limit: 20,
+      totalPages: 5,
+    },
+  })
+  declare pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+
+  @ApiProperty({
+    description: 'Есть ли следующая страница',
+    example: true,
+  })
+  declare hasNext: boolean;
+
+  @ApiProperty({
+    description: 'Есть ли предыдущая страница',
+    example: false,
+  })
+  declare hasPrev: boolean;
 }

@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   CreateUserEpisodeDto,
   MarkEpisodeWatchedDto,
@@ -105,6 +105,37 @@ export class UserEpisodeService {
       relations: ['episode', 'episode.animeRelease'],
       order: { last_watched_at: 'DESC' },
     });
+  }
+
+  async getLastWatchedEpisodes(userId: string): Promise<any[]> {
+    const result = await this.userEpisodeRepository.find({
+      where: {
+        user_id: userId,
+        status: In([EpisodeWatchStatus.WATCHED, EpisodeWatchStatus.WATCHING]),
+      },
+      relations: [
+        'episode',
+        'episode.animeRelease',
+        'episode.animeRelease.anime',
+      ],
+      order: { last_watched_at: 'DESC' },
+      take: 15,
+      skip: 0,
+    });
+
+    // Возвращаем только ID связанных сущностей
+    return result.map((userEpisode) => ({
+      ...userEpisode,
+      episode: {
+        ...userEpisode.episode,
+        anime_release_id: userEpisode.episode.anime_release_id,
+        anime_id: userEpisode.episode.animeRelease?.anime?.id || null,
+        animeRelease: {
+          ...userEpisode.episode.animeRelease,
+          anime: undefined,
+        },
+      },
+    }));
   }
 
   async markAsWatched(

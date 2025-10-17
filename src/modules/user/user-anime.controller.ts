@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -15,12 +16,15 @@ import {
   ApiCookieAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   CreateUserAnimeDto,
+  GetUserAnimeListDto,
+  PaginatedUserAnimeResponseDto,
   UpdateUserAnimeDto,
   UserAnimeResponseDto,
 } from './dto/user-anime.dto';
@@ -92,12 +96,25 @@ export class UserAnimeController {
   @Get('favorites')
   @ApiOperation({
     summary: 'Получить избранные аниме',
-    description: 'Возвращает список аниме, добавленных в избранное',
+    description:
+      'Возвращает список аниме, добавленных в избранное, с пагинацией',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Номер страницы',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Количество элементов на странице',
+    example: 20,
   })
   @ApiResponse({
     status: 200,
     description: 'Список избранных аниме успешно получен',
-    type: [UserAnimeResponseDto],
+    type: PaginatedUserAnimeResponseDto,
   })
   @ApiResponse({
     status: 401,
@@ -105,19 +122,32 @@ export class UserAnimeController {
   })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  getFavorites(@Request() req) {
-    return this.userAnimeService.getFavorites(req.user.id);
+  getFavorites(@Request() req, @Query() query: GetUserAnimeListDto) {
+    return this.userAnimeService.getFavorites(req.user.id, query);
   }
 
   @Get('want-to-watch')
   @ApiOperation({
     summary: 'Получить список "Хочу посмотреть"',
-    description: 'Возвращает список аниме, добавленных в "Хочу посмотреть"',
+    description:
+      'Возвращает список аниме, добавленных в "Хочу посмотреть", с пагинацией',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Номер страницы',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Количество элементов на странице',
+    example: 20,
   })
   @ApiResponse({
     status: 200,
     description: 'Список "Хочу посмотреть" успешно получен',
-    type: [UserAnimeResponseDto],
+    type: PaginatedUserAnimeResponseDto,
   })
   @ApiResponse({
     status: 401,
@@ -125,8 +155,8 @@ export class UserAnimeController {
   })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  getWantToWatch(@Request() req) {
-    return this.userAnimeService.getWantToWatch(req.user.id);
+  getWantToWatch(@Request() req, @Query() query: GetUserAnimeListDto) {
+    return this.userAnimeService.getWantToWatch(req.user.id, query);
   }
 
   @Get(':animeId')

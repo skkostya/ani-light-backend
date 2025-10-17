@@ -24,6 +24,7 @@ import {
   MarkEpisodeWatchedDto,
   UpdateUserEpisodeDto,
   UserEpisodeResponseDto,
+  UserEpisodeWithAnimeInfoResponseDto,
 } from './dto/user-episode.dto';
 import { UserEpisodeService } from './user-episode.service';
 
@@ -129,6 +130,55 @@ export class UserEpisodeController {
   @ApiCookieAuth('access_token')
   getWatching(@Request() req) {
     return this.userEpisodeService.getWatchingEpisodes(req.user.id);
+  }
+
+  @Get('recent')
+  @ApiOperation({
+    summary: 'Получить последние просмотренные эпизоды',
+    description:
+      'Возвращает список последних просмотренных эпизодов с информацией об аниме и релизе',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Список последних просмотренных эпизодов успешно получен',
+    type: [UserEpisodeWithAnimeInfoResponseDto],
+    schema: {
+      example: [
+        {
+          id: 'user-episode-uuid',
+          user_id: 'user-uuid',
+          episode_id: 'episode-uuid',
+          status: 'watched',
+          last_watched_at: '2024-01-01T00:00:00.000Z',
+          watched_until_end_at: '2024-01-01T00:00:00.000Z',
+          rating: 8,
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+          episode: {
+            id: 'episode-uuid',
+            anime_release_id: 'anime-release-uuid',
+            anime_id: 'anime-uuid',
+            number: 1,
+            video_url: 'https://example.com/video.mp4',
+            subtitles_url: 'https://example.com/subtitles.vtt',
+            video_url_480: 'https://example.com/video480.mp4',
+            video_url_720: 'https://example.com/video720.mp4',
+            video_url_1080: 'https://example.com/video1080.mp4',
+            duration: 1440,
+            preview_image: 'https://example.com/preview.jpg',
+          },
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Необходима аутентификация',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  getLastWatched(@Request() req) {
+    return this.userEpisodeService.getLastWatchedEpisodes(req.user.id);
   }
 
   @Get(':episodeId')
