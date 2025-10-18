@@ -92,7 +92,7 @@ export class AnimeReleaseRatingService {
       .createQueryBuilder('rating')
       .select('AVG(rating.rating)', 'average')
       .addSelect('COUNT(rating.id)', 'count')
-      .where('rating.anime_id = :animeId', { animeId })
+      .where('rating.anime_id::text = :animeId', { animeId })
       .getRawOne();
 
     return {

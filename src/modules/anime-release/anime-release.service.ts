@@ -15,7 +15,7 @@ import { Episode } from '../episode/entities/episode.entity';
 import { EpisodeService } from '../episode/episode.service';
 import { AnimeReleaseGenreService } from './anime-release-genre.service';
 import { GetAnimeListDto } from './dto/anime-release.dto';
-import { AnimeRelease } from './entities/anime-release.entity';
+import { AnimeRelease, ReleaseType } from './entities/anime-release.entity';
 import {
   AniLibriaAnime,
   AniLibriaApiResponse,
@@ -352,9 +352,6 @@ export class AnimeReleaseService {
         );
         const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
 
-        // Синхронизируем с основной таблицей anime
-        const anime = await this.syncAnimeFromApiData(apiAnime);
-
         // Создаем новое аниме
         const animeRelease = this.animeReleaseRepo.create({
           external_id: apiAnime.id,
@@ -362,6 +359,7 @@ export class AnimeReleaseService {
           title_en: apiAnime.name?.english || '',
           description: apiAnime.description || '',
           year: apiAnime.year || new Date().getFullYear(),
+          type: apiAnime.type.value as ReleaseType,
           poster_url:
             apiAnime.poster?.optimized?.preview ||
             apiAnime.poster?.preview ||
@@ -382,7 +380,6 @@ export class AnimeReleaseService {
             ? new Date(apiAnime.created_at)
             : undefined,
           age_rating_id: ageRatingId,
-          anime_id: anime.id, // Привязываем к основной таблице anime
         });
 
         await this.animeReleaseRepo.save(animeRelease);
@@ -391,42 +388,16 @@ export class AnimeReleaseService {
           genreIds,
         );
 
+        const franchiseData = await this.getFranchiseData(apiAnime.id);
+        if (franchiseData) {
+          await this.updateAnimeFromFranchiseData(animeRelease, franchiseData);
+        }
+
         console.log(`Synced new anime from API: ${animeRelease.title_ru}`);
       }
     } catch (error) {
       console.error(`Error syncing anime ${apiAnime.id} from API:`, error);
     }
-  }
-
-  /**
-   * Синхронизирует anime-release с основной таблицей anime
-   * Использует правильную архитектуру через AnimeService
-   */
-  private async syncAnimeFromApiData(apiAnime: AniLibriaAnime) {
-    // Сначала пытаемся найти anime по external_id
-    let anime = await this.animeService.findOneByExternalId(
-      apiAnime.id.toString(),
-    );
-
-    if (!anime) {
-      // Если не найден по external_id, пытаемся найти по названию
-      anime = await this.animeService.findByName(
-        apiAnime.name?.main,
-        apiAnime.name?.english,
-      );
-    }
-
-    if (!anime) {
-      // Если anime не существует, создаем его используя AnimeService
-      anime = await this.animeService.createFromApiReleaseData(apiAnime);
-      console.log(`Created new anime: ${anime.name}`);
-    } else {
-      // Если anime существует, обновляем его данные
-      anime = await this.animeService.updateFromApiReleaseData(anime, apiAnime);
-      console.log(`Updated existing anime: ${anime.name}`);
-    }
-
-    return anime;
   }
 
   async getAnimeDetails(id: string, userId?: string) {
@@ -692,21 +663,30 @@ export class AnimeReleaseService {
       // Ищем существующее anime по external_id франшизы
       let anime = await this.animeService.findOneByExternalId(franchiseData.id);
 
+      const firstRelease = animeRelease.sort_order <= 1;
       if (!anime) {
         // Создаем новое anime на основе данных франшизы
-        anime = await this.animeService.createFromFranchiseData(franchiseData);
+        anime = await this.animeService.createFromFranchiseData(
+          franchiseData,
+          firstRelease ? animeRelease.alias : undefined,
+        );
         console.log(`Created new anime from franchise: ${anime.name}`);
       } else {
         // Обновляем существующее anime данными франшизы
         anime = await this.animeService.updateFromFranchiseData(
           anime,
           franchiseData,
+          firstRelease ? animeRelease.alias : undefined,
         );
         console.log(`Updated existing anime from franchise: ${anime.name}`);
       }
 
       // Связываем anime-release с anime
       animeRelease.anime_id = anime.id;
+      animeRelease.sort_order =
+        franchiseData.franchise_releases.find(
+          (item) => item.release_id === animeRelease.external_id,
+        )?.sort_order ?? 0;
       await this.animeReleaseRepo.save(animeRelease);
 
       console.log(

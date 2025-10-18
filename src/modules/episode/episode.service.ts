@@ -5,13 +5,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import * as dotenv from 'dotenv';
 import { Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { AnimeRelease } from '../anime-release/entities/anime-release.entity';
-import {
-  AniLibriaAnime,
-  AniLibriaScheduleEpisode,
-} from '../anime-release/types/anilibria-api.types';
+import { AniLibriaScheduleEpisode } from '../anime-release/types/anilibria-api.types';
 import { Episode } from './entities/episode.entity';
 
 dotenv.config();
@@ -35,17 +31,20 @@ export class EpisodeService {
     const cacheKey = `episodes_anime_${animeId}_${userId || 'anonymous'}`;
     let episodes = await this.cacheManager.get<Episode[]>(cacheKey);
     if (!episodes) {
-      const anime = await this.animeReleaseRepository.findOne({
+      // Проверяем, что anime-release существует (animeId на самом деле это anime_release_id)
+      const animeRelease = await this.animeReleaseRepository.findOne({
         where: { id: animeId },
       });
-      if (!anime)
-        throw new NotFoundException(`Anime with ID ${animeId} not found`);
+      if (!animeRelease)
+        throw new NotFoundException(
+          `Anime release with ID ${animeId} not found`,
+        );
 
-      // Создаем QueryBuilder
+      // Создаем QueryBuilder для получения эпизодов конкретного релиза
       const qb = this.episodeRepository
         .createQueryBuilder('episode')
         .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
-        .where('animeRelease.id = :animeId', { animeId })
+        .where('episode.anime_release_id = :animeId', { animeId })
         .orderBy('episode.number', 'ASC');
 
       // Если есть авторизованный пользователь, добавляем связь userEpisodes с фильтрацией
@@ -60,58 +59,6 @@ export class EpisodeService {
 
       episodes = await qb.getMany();
 
-      if (episodes.length !== anime.episodes_total && anime.external_id) {
-        const data = await this.fetchFromApi<AniLibriaAnime>(
-          `/anime/releases/${anime.external_id}`,
-        );
-        for (const ep of data.episodes) {
-          const existingEpisode = await this.episodeRepository.findOne({
-            where: {
-              animeRelease: { id: anime.id },
-              number: ep.sort_order,
-            },
-          });
-          if (existingEpisode) continue;
-
-          const episode = this.episodeRepository.create({
-            id: uuidv4(),
-            anime_release_id: anime.id,
-            animeRelease: anime,
-            number: ep.sort_order,
-            video_url:
-              this.cleanVideoUrl(ep.hls_1080 || ep.hls_720 || ep.hls_480) || '',
-            video_url_480: this.cleanVideoUrl(ep.hls_480),
-            video_url_720: this.cleanVideoUrl(ep.hls_720),
-            video_url_1080: this.cleanVideoUrl(ep.hls_1080),
-            opening: ep.opening || null,
-            ending: ep.ending || null,
-            duration: ep.duration || null,
-            preview_image:
-              ep.preview?.optimized?.preview || ep.preview?.preview || null,
-            subtitles_url: undefined,
-          } as Partial<Episode>);
-          await this.episodeRepository.save(episode);
-        }
-
-        // После создания эпизодов, загружаем их снова с правильными связями
-        const newQb = this.episodeRepository
-          .createQueryBuilder('episode')
-          .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
-          .where('animeRelease.id = :animeId', { animeId })
-          .orderBy('episode.number', 'ASC');
-
-        if (userId) {
-          newQb.leftJoinAndSelect(
-            'episode.userEpisodes',
-            'userEpisodes',
-            'userEpisodes.user_id = :userId',
-            { userId },
-          );
-        }
-
-        episodes = await newQb.getMany();
-      }
-
       await this.cacheManager.set(cacheKey, episodes, 3600);
     }
     return episodes;
@@ -125,7 +72,7 @@ export class EpisodeService {
       const qb = this.episodeRepository
         .createQueryBuilder('episode')
         .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
-        .where('episode.id = :id', { id });
+        .where('episode.id::text = :id', { id });
 
       // Если есть авторизованный пользователь, добавляем связь userEpisodes с фильтрацией
       if (userId) {
@@ -147,18 +94,20 @@ export class EpisodeService {
   }
 
   async getEpisodeByNumber(
-    animeId: string,
+    alias: string,
+    seasonNumber: number,
     episodeNumber: number,
     userId?: string,
   ) {
-    const cacheKey = `episode_anime_${animeId}_number_${episodeNumber}_${userId || 'anonymous'}`;
+    const cacheKey = `episode_anime_${alias}_season_${seasonNumber}_number_${episodeNumber}_${userId || 'anonymous'}`;
     let episode = await this.cacheManager.get<Episode>(cacheKey);
     if (!episode) {
       // Создаем QueryBuilder
       const qb = this.episodeRepository
         .createQueryBuilder('episode')
         .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
-        .where('animeRelease.id = :animeId', { animeId })
+        .where('animeRelease.alias = :alias', { alias })
+        .andWhere('animeRelease.sort_order = :seasonNumber', { seasonNumber })
         .andWhere('episode.number = :episodeNumber', { episodeNumber });
 
       // Если есть авторизованный пользователь, добавляем связь userEpisodes с фильтрацией
@@ -174,7 +123,7 @@ export class EpisodeService {
       episode = (await qb.getOne()) || undefined;
       if (!episode) {
         throw new NotFoundException(
-          `Episode with number ${episodeNumber} for anime ${animeId} not found`,
+          `Episode with number ${episodeNumber} for anime ${alias} season ${seasonNumber} not found`,
         );
       }
 

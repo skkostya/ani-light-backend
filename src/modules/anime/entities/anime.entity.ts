@@ -17,6 +17,9 @@ export class Anime {
   name_english: string;
 
   @Column({ nullable: true })
+  alias?: string;
+
+  @Column({ nullable: true })
   image?: string;
 
   @Column({ type: 'decimal', precision: 3, scale: 2, nullable: true })

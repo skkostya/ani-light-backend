@@ -184,4 +184,8 @@ export interface AniLibriaFranchiseResponse {
   total_episodes: number;
   total_duration: string;
   total_duration_in_seconds: number;
+  franchise_releases: Array<{
+    sort_order: number;
+    release_id: number;
+  }>;
 }

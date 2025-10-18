@@ -34,6 +34,17 @@ export interface AnimeRatingRelation {
   updated_at: Date;
 }
 
+export enum ReleaseType {
+  TV = 'TV',
+  ONA = 'ONA',
+  WEB = 'WEB',
+  OVA = 'OVA',
+  OAD = 'OAD',
+  MOVIE = 'MOVIE',
+  DORAMA = 'DORAMA',
+  SPECIAL = 'SPECIAL',
+}
+
 @Entity('anime_release')
 export class AnimeRelease {
   @PrimaryGeneratedColumn('uuid')
@@ -64,6 +75,9 @@ export class AnimeRelease {
   @Column({ nullable: true })
   alias?: string;
 
+  @Column({ nullable: true })
+  type?: ReleaseType;
+
   @Column({ default: false })
   is_blocked_by_geo: boolean;
 
@@ -87,6 +101,9 @@ export class AnimeRelease {
 
   @Column({ nullable: true })
   anime_id?: string;
+
+  @Column({ default: 0 })
+  sort_order: number;
 
   @ManyToOne(() => Anime, (anime) => anime.animeReleases, { nullable: true })
   @JoinColumn({ name: 'anime_id' })

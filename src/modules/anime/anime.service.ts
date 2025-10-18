@@ -173,7 +173,7 @@ export class AnimeService {
     const qb = this.animeRepository
       .createQueryBuilder('anime')
       .leftJoinAndSelect('anime.animeReleases', 'animeReleases')
-      .where('anime.id = :id', { id });
+      .where('anime.id::text = :id', { id });
 
     const anime = await qb.getOne();
 
@@ -402,8 +402,10 @@ export class AnimeService {
    */
   async createFromFranchiseData(
     franchiseData: AniLibriaFranchiseResponse,
+    alias?: string,
   ): Promise<Anime> {
     const animeData = this.mapFranchiseDataToAnime(franchiseData);
+    if (alias) animeData.alias = alias;
     const anime = this.animeRepository.create(animeData);
     return this.animeRepository.save(anime);
   }
@@ -414,8 +416,10 @@ export class AnimeService {
   async updateFromFranchiseData(
     existingAnime: Anime,
     franchiseData: AniLibriaFranchiseResponse,
+    alias?: string,
   ): Promise<Anime> {
     const animeData = this.mapFranchiseDataToAnime(franchiseData);
+    if (alias) animeData.alias = alias;
     Object.assign(existingAnime, animeData);
     return this.animeRepository.save(existingAnime);
   }
@@ -449,81 +453,33 @@ export class AnimeService {
   /**
    * Получает все релизы аниме с полной информацией
    */
-  async getAnimeReleases(id: string, userId?: string): Promise<Anime> {
+  async getAnimeReleases(idOrAlias: string, userId?: string): Promise<Anime> {
     const qb = this.animeRepository
       .createQueryBuilder('anime')
       .leftJoinAndSelect('anime.animeReleases', 'animeReleases')
       .leftJoinAndSelect('animeReleases.ageRating', 'ageRating')
       .leftJoinAndSelect('animeReleases.animeGenres', 'animeGenres')
       .leftJoinAndSelect('animeGenres.genre', 'genre')
-      .where('anime.id = :id', { id });
+      .where('anime.id::text = :idOrAlias OR anime.alias = :idOrAlias', {
+        idOrAlias,
+      })
+      .orderBy('animeReleases.sort_order', 'ASC');
 
     const anime = await qb.getOne();
 
     if (!anime) {
-      throw new NotFoundException(`Anime with ID ${id} not found`);
+      throw new NotFoundException(`Anime with ID ${idOrAlias} not found`);
     }
 
     // Если пользователь авторизован, загружаем связь userAnime отдельно
     if (userId) {
       const userAnime = await this.userAnimeRepository.find({
-        where: { anime_id: id, user_id: userId },
+        where: { anime_id: anime.id, user_id: userId },
       });
       anime.userAnime = userAnime;
     }
 
     return anime;
-  }
-
-  /**
-   * Создает anime из данных API релиза
-   */
-  async createFromApiReleaseData(apiAnime: any): Promise<Anime> {
-    const animeData = this.mapApiReleaseDataToAnime(apiAnime);
-    const anime = this.animeRepository.create(animeData);
-    return this.animeRepository.save(anime);
-  }
-
-  /**
-   * Обновляет существующее anime данными из API релиза
-   */
-  async updateFromApiReleaseData(
-    existingAnime: Anime,
-    apiAnime: any,
-  ): Promise<Anime> {
-    // Обновляем год, если текущий релиз новее
-    if (
-      apiAnime.year &&
-      (!existingAnime.last_year || apiAnime.year > existingAnime.last_year)
-    ) {
-      existingAnime.last_year = apiAnime.year;
-    }
-    if (
-      apiAnime.year &&
-      (!existingAnime.first_year || apiAnime.year < existingAnime.first_year)
-    ) {
-      existingAnime.first_year = apiAnime.year;
-    }
-
-    // Обновляем общее количество релизов
-    existingAnime.total_releases = (existingAnime.total_releases || 0) + 1;
-
-    // Обновляем общее количество эпизодов
-    if (apiAnime.episodes_total) {
-      existingAnime.total_episodes =
-        (existingAnime.total_episodes || 0) + apiAnime.episodes_total;
-    }
-
-    // Обновляем изображение, если его еще нет
-    if (
-      !existingAnime.image &&
-      (apiAnime.poster?.optimized?.preview || apiAnime.poster?.preview)
-    ) {
-      existingAnime.image =
-        apiAnime.poster?.optimized?.preview || apiAnime.poster?.preview;
-    }
-
-    return this.animeRepository.save(existingAnime);
   }
 
   /**

@@ -14,7 +14,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { UuidParamDto } from '../../common/dto/uuid-param.dto';
+import { AliasParamDto, UuidParamDto } from '../../common/dto/uuid-param.dto';
 import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
 import { AnimeService } from './anime.service';
 import { GetAnimeListDto } from './dto/anime.dto';
@@ -343,16 +343,16 @@ export class AnimeController {
     return await this.animeService.syncAllAnimeFromApi();
   }
 
-  @Get(':id/releases')
+  @Get(':idOrAlias/releases')
   @ApiOperation({
     summary: 'Получить релизы аниме',
     description:
       'Возвращает все релизы аниме с эпизодами, жанрами, возрастными ограничениями и рейтингом. Поддерживает опциональную аутентификацию через Bearer токен или cookies.',
   })
   @ApiParam({
-    name: 'id',
-    description: 'UUID аниме',
-    example: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92',
+    name: 'idOrAlias',
+    description: 'UUID аниме или alias',
+    example: '116e17d2-e89f-4ffc-bfa4-b45ae4c41e92 или re-zero',
   })
   @ApiResponse({
     status: 200,
@@ -444,7 +444,10 @@ export class AnimeController {
     status: 404,
     description: 'Аниме не найдено',
   })
-  async getAnimeReleases(@Param() params: UuidParamDto, @Request() req: any) {
-    return await this.animeService.getAnimeReleases(params.id, req.user?.id);
+  async getAnimeReleases(@Param() params: AliasParamDto, @Request() req: any) {
+    return await this.animeService.getAnimeReleases(
+      params.idOrAlias,
+      req.user?.id,
+    );
   }
 }

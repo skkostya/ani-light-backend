@@ -31,7 +31,7 @@ export class EpisodeController {
   })
   @ApiQuery({
     name: 'animeId',
-    description: 'ID аниме для получения эпизодов',
+    description: 'ID сезона аниме для получения эпизодов',
     example: 'uuid-anime-id',
     format: 'uuid',
     required: true,
@@ -279,7 +279,8 @@ export class EpisodeController {
     @Request() req: any,
   ) {
     return this.episodeService.getEpisodeByNumber(
-      query.animeId,
+      query.alias,
+      query.seasonNumber,
       query.number,
       req.user?.id as string,
     );
