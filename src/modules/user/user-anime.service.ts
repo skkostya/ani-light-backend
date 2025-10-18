@@ -9,7 +9,7 @@ import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import {
   CreateUserAnimeDto,
   GetUserAnimeListDto,
-  PaginatedUserAnimeResponseDto,
+  PaginatedUserAnimeWithRelationsResponseDto,
   UpdateUserAnimeDto,
 } from './dto/user-anime.dto';
 import { UserAnime } from './entities/user-anime.entity';
@@ -91,13 +91,18 @@ export class UserAnimeService {
   async getFavorites(
     userId: string,
     pagination: GetUserAnimeListDto,
-  ): Promise<PaginatedUserAnimeResponseDto> {
+  ): Promise<PaginatedUserAnimeWithRelationsResponseDto> {
     const { page = 1, limit = 20 } = pagination;
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.userAnimeRepository.findAndCount({
       where: { user_id: userId, is_favorite: true },
-      relations: ['anime'],
+      relations: [
+        'anime',
+        'anime.animeReleases',
+        'anime.animeReleases.animeGenres',
+        'anime.animeReleases.animeGenres.genre',
+      ],
       order: { created_at: 'DESC' },
       skip,
       take: limit,
@@ -108,19 +113,24 @@ export class UserAnimeService {
       total,
       page,
       limit,
-    ) as PaginatedUserAnimeResponseDto;
+    ) as PaginatedUserAnimeWithRelationsResponseDto;
   }
 
   async getWantToWatch(
     userId: string,
     pagination: GetUserAnimeListDto,
-  ): Promise<PaginatedUserAnimeResponseDto> {
+  ): Promise<PaginatedUserAnimeWithRelationsResponseDto> {
     const { page = 1, limit = 20 } = pagination;
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.userAnimeRepository.findAndCount({
       where: { user_id: userId, want_to_watch: true },
-      relations: ['anime'],
+      relations: [
+        'anime',
+        'anime.animeReleases',
+        'anime.animeReleases.animeGenres',
+        'anime.animeReleases.animeGenres.genre',
+      ],
       order: { created_at: 'DESC' },
       skip,
       take: limit,
@@ -131,7 +141,7 @@ export class UserAnimeService {
       total,
       page,
       limit,
-    ) as PaginatedUserAnimeResponseDto;
+    ) as PaginatedUserAnimeWithRelationsResponseDto;
   }
 
   async remove(userId: string, animeId: string): Promise<void> {

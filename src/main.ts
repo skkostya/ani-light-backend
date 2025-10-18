@@ -65,7 +65,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000', // URL фронтенда
+    origin: 'http://localhost:3004', // URL фронтенда
     credentials: true, // ВАЖНО: разрешаем cookies
     methods: 'GET,POST,PUT,DELETE',
     allowedHeaders: 'Content-Type,Authorization',

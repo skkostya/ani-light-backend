@@ -24,7 +24,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   CreateUserAnimeDto,
   GetUserAnimeListDto,
-  PaginatedUserAnimeResponseDto,
+  PaginatedUserAnimeWithRelationsResponseDto,
   UpdateUserAnimeDto,
   UserAnimeResponseDto,
 } from './dto/user-anime.dto';
@@ -113,8 +113,9 @@ export class UserAnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Список избранных аниме успешно получен',
-    type: PaginatedUserAnimeResponseDto,
+    description:
+      'Список избранных аниме успешно получен (с дополнительными связями: релизы аниме и жанры)',
+    type: PaginatedUserAnimeWithRelationsResponseDto,
   })
   @ApiResponse({
     status: 401,
@@ -146,8 +147,9 @@ export class UserAnimeController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Список "Хочу посмотреть" успешно получен',
-    type: PaginatedUserAnimeResponseDto,
+    description:
+      'Список "Хочу посмотреть" успешно получен (с дополнительными связями: релизы аниме и жанры)',
+    type: PaginatedUserAnimeWithRelationsResponseDto,
   })
   @ApiResponse({
     status: 401,

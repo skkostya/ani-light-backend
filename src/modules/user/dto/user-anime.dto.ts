@@ -243,3 +243,74 @@ export class PaginatedUserAnimeResponseDto extends PaginatedResponseDto<UserAnim
   })
   declare hasPrev: boolean;
 }
+
+// Расширенный DTO для ответов с дополнительными связями
+export class UserAnimeWithRelationsResponseDto extends UserAnimeResponseDto {
+  @ApiProperty({
+    description:
+      'Информация об аниме с дополнительными связями (релизы и жанры)',
+    example: {
+      id: 'uuid-anime-id',
+      name: 'Атака титанов',
+      name_english: 'Attack on Titan',
+      animeReleases: [
+        {
+          id: 'uuid-release-id',
+          title_ru: 'Атака титанов',
+          title_en: 'Attack on Titan',
+          animeGenres: [
+            {
+              genre: {
+                id: 'uuid-genre-id',
+                name: 'Драма',
+                external_id: 1,
+                image: {
+                  optimized_preview: 'https://example.com/preview.jpg',
+                  preview: 'https://example.com/full.jpg',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  })
+  anime: any; // Используем any для упрощения, так как структура сложная и уже определена в сущностях
+}
+
+export class PaginatedUserAnimeWithRelationsResponseDto extends PaginatedResponseDto<UserAnimeWithRelationsResponseDto> {
+  @ApiProperty({
+    description:
+      'Список связей пользователя с аниме (с дополнительными связями: релизы аниме и жанры)',
+    type: [UserAnimeWithRelationsResponseDto],
+  })
+  declare data: UserAnimeWithRelationsResponseDto[];
+
+  @ApiProperty({
+    description: 'Информация о пагинации',
+    example: {
+      total: 100,
+      page: 1,
+      limit: 20,
+      totalPages: 5,
+    },
+  })
+  declare pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+
+  @ApiProperty({
+    description: 'Есть ли следующая страница',
+    example: true,
+  })
+  declare hasNext: boolean;
+
+  @ApiProperty({
+    description: 'Есть ли предыдущая страница',
+    example: false,
+  })
+  declare hasPrev: boolean;
+}
