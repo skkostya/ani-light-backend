@@ -507,24 +507,4 @@ export class AnimeService {
 
     return queryBuilder.getOne();
   }
-
-  /**
-   * Маппит данные API релиза в формат сущности Anime
-   */
-  private mapApiReleaseDataToAnime(apiAnime: any): Partial<Anime> {
-    return {
-      external_id: apiAnime.id.toString(),
-      name: apiAnime.name?.main || '',
-      name_english: apiAnime.name?.english || '',
-      image:
-        apiAnime.poster?.optimized?.preview ||
-        apiAnime.poster?.preview ||
-        undefined,
-      first_year: apiAnime.year,
-      last_year: apiAnime.year,
-      total_releases: 1,
-      total_episodes: apiAnime.episodes_total || 0,
-      total_duration_in_seconds: 0,
-    };
-  }
 }

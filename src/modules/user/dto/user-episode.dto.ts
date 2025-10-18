@@ -8,6 +8,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { PaginatedResponseDto } from '../../../common/dto/pagination.dto';
 import { EpisodeWatchStatus } from '../entities/user-episode.entity';
 
 export class CreateUserEpisodeDto {
@@ -197,4 +198,80 @@ export class UserEpisodeWithAnimeInfoResponseDto extends UserEpisodeResponseDto 
     duration?: number;
     preview_image?: string;
   };
+}
+
+export class UserEpisodeHistoryResponseDto extends UserEpisodeResponseDto {
+  @ApiProperty({
+    description: 'Информация об эпизоде',
+    type: 'object',
+    additionalProperties: true,
+  })
+  episode: {
+    id: string;
+    anime_release_id: string;
+    number: number;
+    video_url: string;
+    subtitles_url?: string;
+    video_url_480?: string;
+    video_url_720?: string;
+    video_url_1080?: string;
+    opening?: {
+      start: number;
+      stop: number;
+    };
+    ending?: {
+      start: number;
+      stop: number;
+    };
+    duration?: number;
+    preview_image?: string;
+  };
+
+  @ApiProperty({
+    description: 'Информация о релизе аниме',
+    type: 'object',
+    additionalProperties: true,
+  })
+  animeRelease: {
+    id: string;
+    anime_id: string;
+    title: string;
+    type: string;
+  };
+}
+
+export class PaginatedUserEpisodeHistoryResponseDto extends PaginatedResponseDto<UserEpisodeHistoryResponseDto> {
+  @ApiProperty({
+    description: 'Список эпизодов из истории просмотра',
+    type: [UserEpisodeHistoryResponseDto],
+  })
+  declare data: UserEpisodeHistoryResponseDto[];
+
+  @ApiProperty({
+    description: 'Информация о пагинации',
+    example: {
+      total: 100,
+      page: 1,
+      limit: 20,
+      totalPages: 5,
+    },
+  })
+  declare pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+
+  @ApiProperty({
+    description: 'Есть ли следующая страница',
+    example: true,
+  })
+  declare hasNext: boolean;
+
+  @ApiProperty({
+    description: 'Есть ли предыдущая страница',
+    example: false,
+  })
+  declare hasPrev: boolean;
 }

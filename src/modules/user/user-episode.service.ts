@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import {
   CreateUserEpisodeDto,
   MarkEpisodeWatchedDto,
@@ -136,6 +137,27 @@ export class UserEpisodeService {
         },
       },
     }));
+  }
+
+  async getWatchHistory(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedResponseDto<UserEpisode>> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.userEpisodeRepository.findAndCount({
+      where: {
+        user_id: userId,
+        status: In([EpisodeWatchStatus.WATCHED, EpisodeWatchStatus.WATCHING]),
+      },
+      relations: ['episode', 'episode.animeRelease'],
+      order: { last_watched_at: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async markAsWatched(

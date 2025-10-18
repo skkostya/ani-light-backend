@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
   ApiCookieAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -22,6 +24,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   CreateUserEpisodeDto,
   MarkEpisodeWatchedDto,
+  PaginatedUserEpisodeHistoryResponseDto,
   UpdateUserEpisodeDto,
   UserEpisodeResponseDto,
   UserEpisodeWithAnimeInfoResponseDto,
@@ -179,6 +182,49 @@ export class UserEpisodeController {
   @ApiCookieAuth('access_token')
   getLastWatched(@Request() req) {
     return this.userEpisodeService.getLastWatchedEpisodes(req.user.id);
+  }
+
+  @Get('history')
+  @ApiOperation({
+    summary: 'Получить историю просмотра эпизодов',
+    description:
+      'Возвращает историю просмотра эпизодов с пагинацией. Включает эпизоды со статусами "просмотрено" и "смотрю", отсортированные по дате последнего просмотра',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Номер страницы',
+    required: false,
+    example: 1,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Количество записей на странице',
+    required: false,
+    example: 20,
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'История просмотра эпизодов успешно получена',
+    type: PaginatedUserEpisodeHistoryResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Необходима аутентификация',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  getWatchHistory(
+    @Request() req,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.userEpisodeService.getWatchHistory(
+      req.user.id,
+      page || 1,
+      limit || 20,
+    );
   }
 
   @Get(':episodeId')
