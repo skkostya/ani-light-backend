@@ -331,6 +331,25 @@ export class NextEpisodeResponseDto {
   anime: any;
 
   @ApiProperty({
+    description: 'Информация о релизе аниме (сезоне)',
+    type: 'object',
+    nullable: true,
+    additionalProperties: true,
+  })
+  anime_release: {
+    id: string;
+    title_ru: string;
+    title_en: string;
+    sort_order: number;
+    year: number;
+    poster_url: string;
+    alias?: string;
+    type?: string;
+    is_ongoing: boolean;
+    episodes_total?: number;
+  } | null;
+
+  @ApiProperty({
     description: 'Следующий эпизод для просмотра',
     type: 'object',
     nullable: true,
@@ -346,11 +365,5 @@ export class NextEpisodeResponseDto {
     video_url_1080?: string;
     duration?: number;
     preview_image?: string;
-    animeRelease: {
-      id: string;
-      title_ru: string;
-      title_en: string;
-      sort_order: number;
-    };
   } | null;
 }

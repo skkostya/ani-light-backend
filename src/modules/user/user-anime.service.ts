@@ -242,11 +242,7 @@ export class UserAnimeService {
       relations: ['anime'],
     });
 
-    const result: {
-      anime_id: string;
-      anime: any;
-      next_episode: Episode | null;
-    }[] = [];
+    const result: NextEpisodeResponseDto[] = [];
 
     for (const userAnime of watchingAnime) {
       let nextEpisode: Episode | null = null;
@@ -259,11 +255,15 @@ export class UserAnimeService {
         );
       }
 
-      result.push({
+      // Формируем ответ с информацией о релизе
+      const responseItem: NextEpisodeResponseDto = {
         anime_id: userAnime.anime_id,
         anime: userAnime.anime,
+        anime_release: nextEpisode?.animeRelease || null,
         next_episode: nextEpisode,
-      });
+      };
+
+      result.push(responseItem);
     }
 
     return result;
@@ -275,11 +275,7 @@ export class UserAnimeService {
   async getNextEpisodesForAnime(
     userId: string,
     animeId: string,
-  ): Promise<{
-    anime_id: string;
-    anime: any;
-    next_episode: Episode | null;
-  } | null> {
+  ): Promise<NextEpisodeResponseDto | null> {
     // Получаем аниме пользователя
     const userAnime = await this.userAnimeRepository.findOne({
       where: { user_id: userId, anime_id: animeId },
@@ -303,7 +299,33 @@ export class UserAnimeService {
     return {
       anime_id: userAnime.anime_id,
       anime: userAnime.anime,
-      next_episode: nextEpisode,
+      anime_release: nextEpisode
+        ? {
+            id: nextEpisode.animeRelease.id,
+            title_ru: nextEpisode.animeRelease.title_ru,
+            title_en: nextEpisode.animeRelease.title_en,
+            sort_order: nextEpisode.animeRelease.sort_order,
+            year: nextEpisode.animeRelease.year,
+            poster_url: nextEpisode.animeRelease.poster_url,
+            alias: nextEpisode.animeRelease.alias,
+            type: nextEpisode.animeRelease.type,
+            is_ongoing: nextEpisode.animeRelease.is_ongoing,
+            episodes_total: nextEpisode.animeRelease.episodes_total,
+          }
+        : null,
+      next_episode: nextEpisode
+        ? {
+            id: nextEpisode.id,
+            number: nextEpisode.number,
+            video_url: nextEpisode.video_url,
+            subtitles_url: nextEpisode.subtitles_url,
+            video_url_480: nextEpisode.video_url_480,
+            video_url_720: nextEpisode.video_url_720,
+            video_url_1080: nextEpisode.video_url_1080,
+            duration: nextEpisode.duration,
+            preview_image: nextEpisode.preview_image,
+          }
+        : null,
     };
   }
 }
