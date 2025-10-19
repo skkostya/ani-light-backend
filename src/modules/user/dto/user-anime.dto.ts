@@ -314,3 +314,43 @@ export class PaginatedUserAnimeWithRelationsResponseDto extends PaginatedRespons
   })
   declare hasPrev: boolean;
 }
+
+export class NextEpisodeResponseDto {
+  @ApiProperty({
+    description: 'ID аниме',
+    example: 'uuid-anime-id',
+    format: 'uuid',
+  })
+  anime_id: string;
+
+  @ApiProperty({
+    description: 'Информация об аниме',
+    type: 'object',
+    additionalProperties: true,
+  })
+  anime: any;
+
+  @ApiProperty({
+    description: 'Следующий эпизод для просмотра',
+    type: 'object',
+    nullable: true,
+    additionalProperties: true,
+  })
+  next_episode: {
+    id: string;
+    number: number;
+    video_url: string;
+    subtitles_url?: string;
+    video_url_480?: string;
+    video_url_720?: string;
+    video_url_1080?: string;
+    duration?: number;
+    preview_image?: string;
+    animeRelease: {
+      id: string;
+      title_ru: string;
+      title_en: string;
+      sort_order: number;
+    };
+  } | null;
+}

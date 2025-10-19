@@ -4,21 +4,25 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
+import { Episode } from '../episode/entities/episode.entity';
 import {
   CreateUserAnimeDto,
   GetUserAnimeListDto,
+  NextEpisodeResponseDto,
   PaginatedUserAnimeWithRelationsResponseDto,
   UpdateUserAnimeDto,
 } from './dto/user-anime.dto';
 import { UserAnime } from './entities/user-anime.entity';
+import { UserEpisodeService } from './user-episode.service';
 
 @Injectable()
 export class UserAnimeService {
   constructor(
     @InjectRepository(UserAnime)
     private userAnimeRepository: Repository<UserAnime>,
+    private userEpisodeService: UserEpisodeService,
   ) {}
 
   async create(
@@ -187,5 +191,119 @@ export class UserAnimeService {
 
     userAnime.want_to_watch = !userAnime.want_to_watch;
     return this.userAnimeRepository.save(userAnime);
+  }
+
+  /**
+   * Получает аниме, которые пользователь сейчас смотрит
+   */
+  async getCurrentlyWatchingAnime(userId: string): Promise<UserAnime[]> {
+    return this.userAnimeRepository.find({
+      where: { user_id: userId, is_watching: true },
+      relations: [
+        'anime',
+        'lastWatchedEpisode',
+        'lastWatchedEpisode.animeRelease',
+      ],
+      order: { last_watched_at: 'DESC' },
+    });
+  }
+
+  /**
+   * Получает историю просмотра аниме пользователя
+   */
+  async getWatchHistory(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedResponseDto<UserAnime>> {
+    const [data, total] = await this.userAnimeRepository.findAndCount({
+      where: {
+        user_id: userId,
+        last_watched_episode_id: MoreThan(''), // Есть хотя бы один просмотренный эпизод
+      },
+      relations: ['anime', 'lastWatchedEpisode'],
+      order: { last_watched_at: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return new PaginatedResponseDto(data, total, page, limit);
+  }
+
+  /**
+   * Получает следующие эпизоды для всех просматриваемых аниме пользователя
+   */
+  async getNextEpisodesForWatchingAnime(
+    userId: string,
+  ): Promise<NextEpisodeResponseDto[]> {
+    // Получаем все просматриваемые аниме
+    const watchingAnime = await this.userAnimeRepository.find({
+      where: { user_id: userId, is_watching: true },
+      relations: ['anime'],
+    });
+
+    const result: {
+      anime_id: string;
+      anime: any;
+      next_episode: Episode | null;
+    }[] = [];
+
+    for (const userAnime of watchingAnime) {
+      let nextEpisode: Episode | null = null;
+
+      if (userAnime.last_watched_episode_id) {
+        // Получаем следующий эпизод после последнего просмотренного
+        nextEpisode = await this.userEpisodeService.getNextEpisodeOfAnime(
+          userAnime.anime_id,
+          userAnime.last_watched_episode_id,
+        );
+      }
+
+      result.push({
+        anime_id: userAnime.anime_id,
+        anime: userAnime.anime,
+        next_episode: nextEpisode,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Получает следующие эпизоды для конкретного аниме
+   */
+  async getNextEpisodesForAnime(
+    userId: string,
+    animeId: string,
+  ): Promise<{
+    anime_id: string;
+    anime: any;
+    next_episode: Episode | null;
+  } | null> {
+    // Получаем аниме пользователя
+    const userAnime = await this.userAnimeRepository.findOne({
+      where: { user_id: userId, anime_id: animeId },
+      relations: ['anime'],
+    });
+
+    if (!userAnime) {
+      return null;
+    }
+
+    let nextEpisode: Episode | null = null;
+
+    if (userAnime.last_watched_episode_id) {
+      // Получаем следующий эпизод после последнего просмотренного
+      nextEpisode = await this.userEpisodeService.getNextEpisodeOfAnime(
+        userAnime.anime_id,
+        userAnime.last_watched_episode_id,
+      );
+    }
+
+    return {
+      anime_id: userAnime.anime_id,
+      anime: userAnime.anime,
+      next_episode: nextEpisode,
+    };
   }
 }
