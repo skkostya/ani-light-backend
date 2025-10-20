@@ -1,10 +1,12 @@
 import { HttpModule } from '@nestjs/axios';
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as redisStore from 'cache-manager-redis-store';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
+import { OptionalUserGuard } from '../common/guards/optional-user.guard';
 import { HttpRetryService } from '../common/services/http-retry.service';
 import { ProfanityFilterService } from '../common/services/profanity-filter.service';
 import { AnimeReleaseGenreService } from './anime-release/anime-release-genre.service';
@@ -40,6 +42,7 @@ import { UserAnimeService } from './user/user-anime.service';
 import { UserEpisodeController } from './user/user-episode.controller';
 import { UserEpisodeService } from './user/user-episode.service';
 import { UserNotificationsController } from './user/user-notifications.controller';
+import { UserModule } from './user/user.module';
 import { UserService } from './user/user.service';
 
 const ENTITIES = [
@@ -74,6 +77,7 @@ const SERVICES = [
   ProfanityFilterService,
   HttpRetryService,
   SecurityAuditService,
+  OptionalUserGuard,
 ];
 
 const CONTROLLERS = [
@@ -92,10 +96,15 @@ const CONTROLLERS = [
   imports: [
     TypeOrmModule.forFeature(ENTITIES),
     HttpModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '7d' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '7d' },
+      }),
+      inject: [ConfigService],
     }),
+    UserModule,
     CacheModule.register({
       store: redisStore,
       host: process.env.REDIS_HOST || 'localhost',

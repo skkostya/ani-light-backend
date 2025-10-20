@@ -166,6 +166,83 @@ export class UserAnimeController {
     return this.userAnimeService.getWantToWatch(req.user.id, query);
   }
 
+  @Get('next-episodes')
+  @ApiOperation({
+    summary: 'Получить следующие эпизоды для всех просматриваемых аниме',
+    description:
+      'Возвращает список аниме с информацией о следующих эпизодах для просмотра',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Список аниме с следующими эпизодами успешно получен',
+    type: [NextEpisodeResponseDto],
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Необходима аутентификация',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  getNextEpisodes(@Request() req) {
+    return this.userAnimeService.getNextEpisodesForWatchingAnime(req.user.id);
+  }
+
+  @Get('currently-watching')
+  @ApiOperation({
+    summary: 'Получить текущие просматриваемые аниме',
+    description: 'Возвращает список аниме, которые пользователь сейчас смотрит',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Список текущих просматриваемых аниме успешно получен',
+    type: [UserAnimeResponseDto],
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Необходима аутентификация',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  getCurrentlyWatching(@Request() req) {
+    return this.userAnimeService.getCurrentlyWatchingAnime(req.user.id);
+  }
+
+  @Get('watch-history')
+  @ApiOperation({
+    summary: 'Получить историю просмотра аниме',
+    description: 'Возвращает историю просмотра аниме пользователя с пагинацией',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Номер страницы',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Количество элементов на странице',
+    example: 20,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'История просмотра аниме успешно получена',
+    type: PaginatedUserAnimeWithRelationsResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Необходима аутентификация',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  getWatchHistory(@Request() req, @Query() query: GetUserAnimeListDto) {
+    return this.userAnimeService.getWatchHistory(
+      req.user.id,
+      query.page,
+      query.limit,
+    );
+  }
+
   @Get(':animeId')
   @ApiOperation({
     summary: 'Получить информацию об аниме пользователя',
@@ -332,62 +409,6 @@ export class UserAnimeController {
     return this.userAnimeService.remove(req.user.id, animeId);
   }
 
-  @Get('currently-watching')
-  @ApiOperation({
-    summary: 'Получить текущие просматриваемые аниме',
-    description: 'Возвращает список аниме, которые пользователь сейчас смотрит',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Список текущих просматриваемых аниме успешно получен',
-    type: [UserAnimeResponseDto],
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
-  getCurrentlyWatching(@Request() req) {
-    return this.userAnimeService.getCurrentlyWatchingAnime(req.user.id);
-  }
-
-  @Get('watch-history')
-  @ApiOperation({
-    summary: 'Получить историю просмотра аниме',
-    description: 'Возвращает историю просмотра аниме пользователя с пагинацией',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Номер страницы',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Количество элементов на странице',
-    example: 20,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'История просмотра аниме успешно получена',
-    type: PaginatedUserAnimeWithRelationsResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
-  getWatchHistory(@Request() req, @Query() query: GetUserAnimeListDto) {
-    return this.userAnimeService.getWatchHistory(
-      req.user.id,
-      query.page,
-      query.limit,
-    );
-  }
-
   @Delete(':animeId/stop-watching')
   @ApiOperation({
     summary: 'Прекратить просмотр аниме',
@@ -415,27 +436,6 @@ export class UserAnimeController {
   @ApiCookieAuth('access_token')
   stopWatching(@Request() req, @Param('animeId') animeId: string) {
     return this.userEpisodeService.stopWatchingAnime(req.user.id, animeId);
-  }
-
-  @Get('next-episodes')
-  @ApiOperation({
-    summary: 'Получить следующие эпизоды для всех просматриваемых аниме',
-    description:
-      'Возвращает список аниме с информацией о следующих эпизодах для просмотра',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Список аниме с следующими эпизодами успешно получен',
-    type: [NextEpisodeResponseDto],
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
-  getNextEpisodes(@Request() req) {
-    return this.userAnimeService.getNextEpisodesForWatchingAnime(req.user.id);
   }
 
   @Get(':animeId/next-episode')

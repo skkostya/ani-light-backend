@@ -16,6 +16,8 @@ import {
 } from '@nestjs/swagger';
 import { AliasParamDto, UuidParamDto } from '../../common/dto/uuid-param.dto';
 import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
+import { OptionalUserGuard } from '../../common/guards/optional-user.guard';
+import { User } from '../user/entities/user.entity';
 import { AnimeService } from './anime.service';
 import { GetAnimeListDto } from './dto/anime.dto';
 
@@ -142,8 +144,10 @@ export class AnimeController {
       },
     },
   })
+  @UseGuards(OptionalUserGuard)
   async findAll(@Query() query: GetAnimeListDto, @Request() req: any) {
-    return await this.animeService.findAll(query, req.user?.id);
+    const user: User | null = req.user;
+    return await this.animeService.findAll(query, user?.id);
   }
 
   @Get(':id')
@@ -196,8 +200,10 @@ export class AnimeController {
     status: 404,
     description: 'Аниме не найдено',
   })
+  @UseGuards(OptionalUserGuard)
   async findOne(@Param() params: UuidParamDto, @Request() req: any) {
-    return await this.animeService.findOne(params.id, req.user?.id);
+    const user: User | null = req.user;
+    return await this.animeService.findOne(params.id, user?.id);
   }
 
   @Get(':id/stats')
@@ -259,16 +265,14 @@ export class AnimeController {
     description:
       'Список аниме по жанру получен. Для авторизованных пользователей включает связь userAnime',
   })
+  @UseGuards(OptionalUserGuard)
   async getByGenre(
     @Param('genreName') genreName: string,
     @Query() query: GetAnimeListDto,
     @Request() req: any,
   ) {
-    return await this.animeService.getAnimeByGenre(
-      genreName,
-      query,
-      req.user?.id,
-    );
+    const user: User | null = req.user;
+    return await this.animeService.getAnimeByGenre(genreName, query, user?.id);
   }
 
   @Get('ongoing')
@@ -294,8 +298,10 @@ export class AnimeController {
     description:
       'Список продолжающихся аниме получен. Для авторизованных пользователей включает связь userAnime',
   })
+  @UseGuards(OptionalUserGuard)
   async getOngoing(@Query() query: GetAnimeListDto, @Request() req: any) {
-    return await this.animeService.getOngoingAnime(query, req.user?.id);
+    const user: User | null = req.user;
+    return await this.animeService.getOngoingAnime(query, user?.id);
   }
 
   @Get('stats/genres')
@@ -444,10 +450,9 @@ export class AnimeController {
     status: 404,
     description: 'Аниме не найдено',
   })
+  @UseGuards(OptionalUserGuard)
   async getAnimeReleases(@Param() params: AliasParamDto, @Request() req: any) {
-    return await this.animeService.getAnimeReleases(
-      params.idOrAlias,
-      req.user?.id,
-    );
+    const user: User | null = req.user;
+    return await this.animeService.getAnimeReleases(params.idOrAlias, user?.id);
   }
 }

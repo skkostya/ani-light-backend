@@ -1,9 +1,12 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { redisStore } from 'cache-manager-redis-store';
 import { HttpRetryService } from 'src/common/services/http-retry.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
+import { OptionalUserGuard } from '../common/guards/optional-user.guard';
 import { AnimeReleaseGenreService } from './anime-release/anime-release-genre.service';
 import { AnimeReleaseService } from './anime-release/anime-release.service';
 import { AnimeGenre } from './anime-release/entities/anime-release-genre.entity';
@@ -26,6 +29,7 @@ import { EpisodeService } from './episode/episode.service';
 import { UserAnime } from './user/entities/user-anime.entity';
 import { UserEpisode } from './user/entities/user-episode.entity';
 import { User } from './user/entities/user.entity';
+import { UserModule } from './user/user.module';
 
 const ENTITIES = [
   Anime,
@@ -52,6 +56,7 @@ const SERVICES = [
   EpisodeService,
   HttpRetryService,
   SecurityAuditService,
+  OptionalUserGuard,
 ];
 
 const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
@@ -59,6 +64,15 @@ const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
 @Module({
   imports: [
     TypeOrmModule.forFeature(ENTITIES),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '7d' },
+      }),
+      inject: [ConfigService],
+    }),
+    UserModule,
     CacheModule.register({
       store: redisStore,
       host: process.env.REDIS_HOST || 'localhost',
