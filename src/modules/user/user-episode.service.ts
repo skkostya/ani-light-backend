@@ -28,6 +28,8 @@ export class UserEpisodeService {
     private userAnimeRepository: Repository<UserAnime>,
     @InjectRepository(AnimeRelease)
     private animeReleaseRepository: Repository<AnimeRelease>,
+    @InjectRepository(Episode)
+    private episodeRepository: Repository<Episode>,
   ) {}
 
   async create(
@@ -248,10 +250,8 @@ export class UserEpisodeService {
     animeId: string,
   ): Promise<string | null> {
     // Находим последний завершенный сезон (с максимальным sort_order и is_ongoing: false)
-    const lastSeason = await this.userEpisodeRepository
-      .createQueryBuilder('userEpisode')
-      .leftJoin('userEpisode.episode', 'episode')
-      .leftJoin('episode.animeRelease', 'animeRelease')
+    const lastSeason = await this.animeReleaseRepository
+      .createQueryBuilder('animeRelease')
       .where('animeRelease.anime_id = :animeId', { animeId })
       .andWhere('animeRelease.is_ongoing = :isOngoing', { isOngoing: false })
       .select('animeRelease.sort_order', 'sort_order')
@@ -261,10 +261,9 @@ export class UserEpisodeService {
 
     if (!lastSeason) return null;
 
-    // Находим последний эпизод этого сезона
-    const lastEpisode = await this.userEpisodeRepository
-      .createQueryBuilder('userEpisode')
-      .leftJoin('userEpisode.episode', 'episode')
+    // Находим последний эпизод этого сезона из всех доступных эпизодов
+    const lastEpisode = await this.episodeRepository
+      .createQueryBuilder('episode')
       .leftJoin('episode.animeRelease', 'animeRelease')
       .where('animeRelease.anime_id = :animeId', { animeId })
       .andWhere('animeRelease.sort_order = :sortOrder', {
@@ -301,10 +300,9 @@ export class UserEpisodeService {
     const currentSeason = currentEpisode.episode.animeRelease.sort_order;
     const currentEpisodeNumber = currentEpisode.episode.number;
 
-    // Ищем следующий эпизод в том же сезоне
-    const nextEpisodeInSeason = await this.userEpisodeRepository
-      .createQueryBuilder('userEpisode')
-      .leftJoinAndSelect('userEpisode.episode', 'episode')
+    // Ищем следующий эпизод в том же сезоне из всех доступных эпизодов
+    const nextEpisodeInSeason = await this.episodeRepository
+      .createQueryBuilder('episode')
       .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
       .where('animeRelease.anime_id = :animeId', { animeId })
       .andWhere('animeRelease.sort_order = :sortOrder', {
@@ -317,15 +315,14 @@ export class UserEpisodeService {
       .limit(1)
       .getOne();
 
-    if (nextEpisodeInSeason?.episode) {
-      return nextEpisodeInSeason.episode;
+    if (nextEpisodeInSeason) {
+      return nextEpisodeInSeason;
     }
 
     // Если в текущем сезоне нет следующего эпизода, ищем первый эпизод следующего сезона
     // (включая продолжающиеся сезоны)
-    const nextSeason = await this.userEpisodeRepository
-      .createQueryBuilder('userEpisode')
-      .leftJoinAndSelect('userEpisode.episode', 'episode')
+    const nextSeason = await this.episodeRepository
+      .createQueryBuilder('episode')
       .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
       .where('animeRelease.anime_id = :animeId', { animeId })
       .andWhere('animeRelease.sort_order > :sortOrder', {
@@ -336,8 +333,8 @@ export class UserEpisodeService {
       .limit(1)
       .getOne();
 
-    if (nextSeason?.episode) {
-      return nextSeason.episode;
+    if (nextSeason) {
+      return nextSeason;
     }
 
     return null;

@@ -48,17 +48,17 @@ import { UserModule } from './modules/user/user.module';
         {
           name: 'short',
           ttl: 1000, // 1 секунда
-          limit: 3, // 3 запроса в секунду
+          limit: 10, // 10 запросов в секунду
         },
         {
           name: 'medium',
           ttl: 10000, // 10 секунд
-          limit: 20, // 20 запросов за 10 секунд
+          limit: 50, // 50 запросов за 10 секунд
         },
         {
           name: 'long',
           ttl: 60000, // 1 минута
-          limit: 100, // 100 запросов в минуту
+          limit: 200, // 200 запросов в минуту
         },
       ],
       inject: [],

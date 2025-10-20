@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { AnimeRelease } from '../anime-release/entities/anime-release.entity';
 import { AniLibriaScheduleEpisode } from '../anime-release/types/anilibria-api.types';
+import { AniLibriaReleaseResponse } from './dto/anilibria-release-response.dto';
 import { Episode } from './entities/episode.entity';
 
 dotenv.config();
@@ -59,7 +60,26 @@ export class EpisodeService {
 
       episodes = await qb.getMany();
 
-      await this.cacheManager.set(cacheKey, episodes, 3600);
+      // Если эпизодов нет в базе данных, запрашиваем их с AniLibria API
+      if (episodes.length === 0 && animeRelease.external_id) {
+        try {
+          const apiResponse = await this.fetchReleaseFromApi(
+            animeRelease.external_id,
+          );
+          episodes = await this.createEpisodesFromApiResponse(
+            { ...animeRelease, episodes },
+            apiResponse,
+          );
+
+          // Обновляем кэш с новыми данными
+          await this.cacheManager.set(cacheKey, episodes, 3600);
+        } catch (error) {
+          console.error('Failed to fetch episodes from AniLibria API:', error);
+          // Возвращаем пустой массив, если не удалось получить данные с API
+        }
+      } else {
+        await this.cacheManager.set(cacheKey, episodes, 3600);
+      }
     }
     return episodes;
   }
@@ -175,6 +195,72 @@ export class EpisodeService {
     const url = `${this.apiUrl}${endpoint}`;
     const response = await this.httpRetryService.get(url);
     return response.data;
+  }
+
+  /**
+   * Запрашивает данные релиза с AniLibria API
+   */
+  private async fetchReleaseFromApi(
+    externalId: number,
+  ): Promise<AniLibriaReleaseResponse> {
+    const endpoint = `/anime/releases/${externalId}`;
+    return await this.fetchFromApi<AniLibriaReleaseResponse>(endpoint);
+  }
+
+  /**
+   * Создает эпизоды из ответа AniLibria API
+   */
+  private async createEpisodesFromApiResponse(
+    animeRelease: AnimeRelease,
+    apiResponse: AniLibriaReleaseResponse,
+  ): Promise<Episode[]> {
+    if (!apiResponse.episodes || apiResponse.episodes.length === 0) {
+      return [];
+    }
+
+    const episodes: Episode[] = [];
+
+    for (const apiEpisode of apiResponse.episodes) {
+      // Проверяем, есть ли уже такой эпизод
+      const existingEpisode = await this.episodeRepository.findOne({
+        where: {
+          animeRelease: { id: animeRelease.id },
+          number: apiEpisode.ordinal || apiEpisode.sort_order,
+        },
+      });
+
+      if (existingEpisode) {
+        episodes.push(existingEpisode);
+        continue;
+      }
+
+      // Создаем новый эпизод
+      const newEpisode = this.episodeRepository.create({
+        anime_release_id: animeRelease.id,
+        animeRelease: animeRelease,
+        number: apiEpisode.ordinal || apiEpisode.sort_order,
+        video_url:
+          this.cleanVideoUrl(
+            apiEpisode.hls_1080 || apiEpisode.hls_720 || apiEpisode.hls_480,
+          ) || '',
+        video_url_480: this.cleanVideoUrl(apiEpisode.hls_480),
+        video_url_720: this.cleanVideoUrl(apiEpisode.hls_720),
+        video_url_1080: this.cleanVideoUrl(apiEpisode.hls_1080),
+        opening: apiEpisode.opening || null,
+        ending: apiEpisode.ending || null,
+        duration: apiEpisode.duration || null,
+        preview_image:
+          apiEpisode.preview?.optimized?.preview ||
+          apiEpisode.preview?.preview ||
+          null,
+        subtitles_url: undefined, // В API нет информации о субтитрах
+      } as Partial<Episode>);
+
+      const savedEpisode = await this.episodeRepository.save(newEpisode);
+      episodes.push(savedEpisode);
+    }
+
+    return episodes;
   }
 
   /**
