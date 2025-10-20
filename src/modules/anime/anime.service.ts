@@ -405,7 +405,7 @@ export class AnimeService {
     alias?: string,
   ): Promise<Anime> {
     const animeData = this.mapFranchiseDataToAnime(franchiseData);
-    if (alias) animeData.alias = alias;
+    if (alias && !animeData.alias) animeData.alias = alias;
     const anime = this.animeRepository.create(animeData);
     return this.animeRepository.save(anime);
   }

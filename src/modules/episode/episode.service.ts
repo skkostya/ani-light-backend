@@ -126,7 +126,8 @@ export class EpisodeService {
       const qb = this.episodeRepository
         .createQueryBuilder('episode')
         .leftJoinAndSelect('episode.animeRelease', 'animeRelease')
-        .where('animeRelease.alias = :alias', { alias })
+        .leftJoinAndSelect('animeRelease.anime', 'anime')
+        .where('anime.alias = :alias', { alias })
         .andWhere('animeRelease.sort_order = :seasonNumber', { seasonNumber })
         .andWhere('episode.number = :episodeNumber', { episodeNumber });
 

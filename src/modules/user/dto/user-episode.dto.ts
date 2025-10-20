@@ -237,6 +237,10 @@ export class UserEpisodeHistoryResponseDto extends UserEpisodeResponseDto {
     anime_id: string;
     title: string;
     type: string;
+    anime: {
+      id: string;
+      alias: string;
+    };
   };
 }
 

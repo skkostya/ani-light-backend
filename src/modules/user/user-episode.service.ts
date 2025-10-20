@@ -160,7 +160,11 @@ export class UserEpisodeService {
         user_id: userId,
         status: In([EpisodeWatchStatus.WATCHED, EpisodeWatchStatus.WATCHING]),
       },
-      relations: ['episode', 'episode.animeRelease'],
+      relations: [
+        'episode',
+        'episode.animeRelease',
+        'episode.animeRelease.anime',
+      ],
       order: { last_watched_at: 'DESC' },
       skip,
       take: limit,
@@ -279,7 +283,9 @@ export class UserEpisodeService {
   }
 
   /**
-   * Получает следующий эпизод аниме после указанного эпизода
+   * Получает следующий эпизод аниме после указанного эпизода.
+   * Если текущий эпизод еще смотрим (watching) или не просмотрен (not_watched),
+   * возвращает текущий эпизод. Если просмотрен (watched), ищет следующий.
    */
   async getNextEpisodeOfAnime(
     animeId: string,
@@ -297,6 +303,15 @@ export class UserEpisodeService {
 
     if (!currentEpisode?.episode?.animeRelease) return null;
 
+    // Если текущий эпизод еще смотрим (watching) или не просмотрен (not_watched), возвращаем его
+    if (
+      currentEpisode.status === EpisodeWatchStatus.WATCHING ||
+      currentEpisode.status === EpisodeWatchStatus.NOT_WATCHED
+    ) {
+      return currentEpisode.episode;
+    }
+
+    // Если эпизод просмотрен (watched), ищем следующий
     const currentSeason = currentEpisode.episode.animeRelease.sort_order;
     const currentEpisodeNumber = currentEpisode.episode.number;
 
@@ -421,29 +436,24 @@ export class UserEpisodeService {
 
     await this.userAnimeRepository.save(userAnime);
 
-    // Получаем все релизы этого аниме
-    const animeReleaseIds = await this.userEpisodeRepository
-      .createQueryBuilder('userEpisode')
-      .leftJoin('userEpisode.episode', 'episode')
+    // Получаем все ID эпизодов этого аниме через релизы
+    const rawEpisodeIds = await this.episodeRepository
+      .createQueryBuilder('episode')
       .leftJoin('episode.animeRelease', 'animeRelease')
       .where('animeRelease.anime_id = :animeId', { animeId })
-      .select('DISTINCT episode.anime_release_id', 'anime_release_id')
+      .select('episode.id', 'id')
       .getRawMany();
 
-    const releaseIds = animeReleaseIds.map(
-      (item) => item.episode_anime_release_id,
-    );
+    const episodeIds = rawEpisodeIds.map((row) => row.id);
 
-    if (releaseIds.length > 0) {
+    if (episodeIds.length > 0) {
       // Удаляем все связи с эпизодами этого аниме
       await this.userEpisodeRepository
         .createQueryBuilder()
         .delete()
+        .from(UserEpisode)
         .where('user_id = :userId', { userId })
-        .andWhere(
-          'episode_id IN (SELECT id FROM episode WHERE anime_release_id IN (:...releaseIds))',
-          { releaseIds },
-        )
+        .andWhere('episode_id IN (:...episodeIds)', { episodeIds })
         .execute();
     }
   }
