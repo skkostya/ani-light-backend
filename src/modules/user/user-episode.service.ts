@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
-import { AnimeRelease } from '../anime-release/entities/anime-release.entity';
+import {
+  AnimeRelease,
+  ReleaseType,
+} from '../anime-release/entities/anime-release.entity';
 import { Episode } from '../episode/entities/episode.entity';
 import {
   CreateUserEpisodeDto,
@@ -258,6 +261,7 @@ export class UserEpisodeService {
       .createQueryBuilder('animeRelease')
       .where('animeRelease.anime_id = :animeId', { animeId })
       .andWhere('animeRelease.is_ongoing = :isOngoing', { isOngoing: false })
+      .andWhere('animeRelease.type != :type', { type: ReleaseType.MOVIE })
       .select('animeRelease.sort_order', 'sort_order')
       .orderBy('animeRelease.sort_order', 'DESC')
       .limit(1)
@@ -273,6 +277,7 @@ export class UserEpisodeService {
       .andWhere('animeRelease.sort_order = :sortOrder', {
         sortOrder: lastSeason.sort_order,
       })
+      .andWhere('animeRelease.type != :type', { type: ReleaseType.MOVIE })
       .andWhere('animeRelease.is_ongoing = :isOngoing', { isOngoing: false })
       .select('episode.id', 'id')
       .orderBy('episode.number', 'DESC')
@@ -299,6 +304,7 @@ export class UserEpisodeService {
       .where('userEpisode.episode_id = :episodeId', {
         episodeId: currentEpisodeId,
       })
+      .andWhere('animeRelease.type != :type', { type: ReleaseType.MOVIE })
       .getOne();
 
     if (!currentEpisode?.episode?.animeRelease) return null;
@@ -343,6 +349,7 @@ export class UserEpisodeService {
       .andWhere('animeRelease.sort_order > :sortOrder', {
         sortOrder: currentSeason,
       })
+      .andWhere('animeRelease.type != :type', { type: ReleaseType.MOVIE })
       .orderBy('animeRelease.sort_order', 'ASC')
       .orderBy('episode.number', 'ASC')
       .limit(1)
