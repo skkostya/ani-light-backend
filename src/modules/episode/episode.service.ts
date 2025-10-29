@@ -6,7 +6,10 @@ import type { Cache } from 'cache-manager';
 import * as dotenv from 'dotenv';
 import { Repository } from 'typeorm';
 import { HttpRetryService } from '../../common/services/http-retry.service';
-import { AnimeRelease } from '../anime-release/entities/anime-release.entity';
+import {
+  AnimeRelease,
+  ReleaseType,
+} from '../anime-release/entities/anime-release.entity';
 import { AniLibriaScheduleEpisode } from '../anime-release/types/anilibria-api.types';
 import { AniLibriaReleaseResponse } from './dto/anilibria-release-response.dto';
 import { Episode } from './entities/episode.entity';
@@ -262,6 +265,102 @@ export class EpisodeService {
     }
 
     return episodes;
+  }
+
+  /**
+   * Получает следующий эпизод для указанного аниме
+   * @param alias - alias аниме
+   * @param seasonNumber - номер текущего сезона
+   * @param episodeNumber - номер текущего эпизода
+   * @returns объект с номером следующего эпизода и sort_order сезона, или null если следующего эпизода нет
+   */
+  async getNextEpisode(
+    alias: string,
+    seasonNumber: number,
+    episodeNumber: number,
+  ): Promise<{ nextEpisodeNumber: number; seasonSortOrder: number } | null> {
+    const cacheKey = `next_episode_${alias}_season_${seasonNumber}_episode_${episodeNumber}`;
+    let result = await this.cacheManager.get<{
+      nextEpisodeNumber: number;
+      seasonSortOrder: number;
+    } | null>(cacheKey);
+
+    if (result !== undefined) {
+      return result;
+    }
+
+    // Получаем все сезоны аниме, исключая MOVIE, отсортированные по sort_order
+    const animeReleases = await this.animeReleaseRepository
+      .createQueryBuilder('animeRelease')
+      .leftJoinAndSelect('animeRelease.anime', 'anime')
+      .where('anime.alias = :alias', { alias })
+      .andWhere('animeRelease.type != :movieType', {
+        movieType: ReleaseType.MOVIE,
+      })
+      .orderBy('animeRelease.sort_order', 'ASC')
+      .getMany();
+
+    if (animeReleases.length === 0) {
+      await this.cacheManager.set(cacheKey, null, 3600);
+      return null;
+    }
+
+    // Находим текущий сезон
+    const currentSeason = animeReleases.find(
+      (release) => release.sort_order === seasonNumber,
+    );
+
+    if (!currentSeason) {
+      await this.cacheManager.set(cacheKey, null, 3600);
+      return null;
+    }
+
+    // Проверяем, есть ли следующий эпизод в текущем сезоне
+    const nextEpisodeInCurrentSeason = await this.episodeRepository.findOne({
+      where: {
+        anime_release_id: currentSeason.id,
+        number: episodeNumber + 1,
+      },
+    });
+
+    if (nextEpisodeInCurrentSeason) {
+      result = {
+        nextEpisodeNumber: episodeNumber + 1,
+        seasonSortOrder: currentSeason.sort_order,
+      };
+      await this.cacheManager.set(cacheKey, result, 3600);
+      return result;
+    }
+
+    // Если в текущем сезоне нет следующего эпизода, ищем первый эпизод следующего сезона
+    const nextSeason = animeReleases.find(
+      (release) => release.sort_order > seasonNumber,
+    );
+
+    if (!nextSeason) {
+      await this.cacheManager.set(cacheKey, null, 3600);
+      return null;
+    }
+
+    // Ищем первый эпизод следующего сезона
+    const firstEpisodeOfNextSeason = await this.episodeRepository.findOne({
+      where: {
+        anime_release_id: nextSeason.id,
+        number: 1,
+      },
+    });
+
+    if (firstEpisodeOfNextSeason) {
+      result = {
+        nextEpisodeNumber: 1,
+        seasonSortOrder: nextSeason.sort_order,
+      };
+      await this.cacheManager.set(cacheKey, result, 3600);
+      return result;
+    }
+
+    await this.cacheManager.set(cacheKey, null, 3600);
+    return null;
   }
 
   /**

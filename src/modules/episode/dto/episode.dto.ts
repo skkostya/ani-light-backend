@@ -41,3 +41,33 @@ export class GetEpisodeByNumberDto {
   @Min(1, { message: 'Номер эпизода должен быть больше 0' })
   number: number;
 }
+
+export class GetNextEpisodeDto {
+  @ApiProperty({
+    description: 'alias аниме',
+    example: 're-zero',
+  })
+  @IsString({ message: 'alias должен быть строкой' })
+  @IsNotEmpty({ message: 'alias не может быть пустым' })
+  alias: string;
+
+  @ApiProperty({
+    description: 'Номер сезона',
+    example: 1,
+    type: 'number',
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Номер сезона должен быть числом' })
+  @Min(1, { message: 'Номер сезона должен быть больше 0' })
+  seasonNumber: number;
+
+  @ApiProperty({
+    description: 'Номер эпизода',
+    example: 1,
+    type: 'number',
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Номер эпизода должен быть числом' })
+  @Min(1, { message: 'Номер эпизода должен быть больше 0' })
+  number: number;
+}

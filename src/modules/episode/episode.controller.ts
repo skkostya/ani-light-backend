@@ -15,7 +15,11 @@ import {
 } from '@nestjs/swagger';
 import { UuidParamDto } from '../../common/dto/uuid-param.dto';
 import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
-import { GetEpisodeByNumberDto, GetEpisodesDto } from './dto/episode.dto';
+import {
+  GetEpisodeByNumberDto,
+  GetEpisodesDto,
+  GetNextEpisodeDto,
+} from './dto/episode.dto';
 import { EpisodeService } from './episode.service';
 
 @ApiTags('episodes')
@@ -283,6 +287,71 @@ export class EpisodeController {
       query.seasonNumber,
       query.number,
       req.user?.id as string,
+    );
+  }
+
+  @Get('next')
+  @ApiOperation({
+    summary: 'Получить следующий эпизод',
+    description:
+      'Возвращает информацию о следующем эпизоде для указанного аниме. Если в текущем сезоне нет следующего эпизода, возвращает первый эпизод следующего сезона. Игнорирует anime-release с типом MOVIE.',
+  })
+  @ApiQuery({
+    name: 'alias',
+    description: 'alias аниме',
+    example: 're-zero',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'seasonNumber',
+    description: 'Номер текущего сезона',
+    example: 1,
+    type: 'number',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'number',
+    description: 'Номер текущего эпизода',
+    example: 1,
+    type: 'number',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Информация о следующем эпизоде успешно получена',
+    schema: {
+      type: 'object',
+      properties: {
+        nextEpisodeNumber: {
+          type: 'number',
+          example: 2,
+          description: 'Номер следующего эпизода',
+        },
+        seasonSortOrder: {
+          type: 'number',
+          example: 1,
+          description:
+            'sort_order сезона, в котором находится следующий эпизод',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Следующего эпизода не найдено',
+    schema: {
+      type: 'null',
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Некорректные параметры запроса',
+  })
+  async getNextEpisode(@Query() query: GetNextEpisodeDto) {
+    return await this.episodeService.getNextEpisode(
+      query.alias,
+      query.seasonNumber,
+      query.number,
     );
   }
 
