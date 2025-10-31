@@ -5,6 +5,7 @@ import {
   Post,
   Request,
   Response,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -165,11 +166,7 @@ export class UserController {
   getProfile(@Request() req: any) {
     // Если пользователь не аутентифицирован, возвращаем информацию об этом
     if (!req.user) {
-      return {
-        authenticated: false,
-        message: 'Пользователь не аутентифицирован',
-        shouldHideAds: false, // Показываем рекламу неаутентифицированным пользователям
-      };
+      throw new UnauthorizedException('Пользователь не аутентифицирован');
     }
 
     // Если пользователь аутентифицирован, возвращаем его данные
