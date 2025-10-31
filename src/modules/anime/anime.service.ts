@@ -1,13 +1,19 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as dotenv from 'dotenv';
+import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
+import { ReleaseType } from '../anime-release/entities/anime-release.entity';
 import { AniLibriaFranchiseResponse } from '../anime-release/types/anilibria-api.types';
 import { UserAnime } from '../user/entities/user-anime.entity';
 import { ExternalApiAnimeDto, GetAnimeListDto } from './dto/anime.dto';
 import { Anime } from './entities/anime.entity';
+
+dotenv.config();
+const configService = new ConfigService();
 
 @Injectable()
 export class AnimeService {
@@ -21,6 +27,7 @@ export class AnimeService {
     private userAnimeRepository: Repository<UserAnime>,
     private readonly configService: ConfigService,
     private readonly httpRetryService: HttpRetryService,
+    private readonly colorExtractorService: ColorExtractorService,
   ) {
     this.apiUrl = this.configService.get('ANILIBRIA_API_URL') || '';
   }
@@ -405,7 +412,16 @@ export class AnimeService {
     alias?: string,
   ): Promise<Anime> {
     const animeData = this.mapFranchiseDataToAnime(franchiseData);
+    const accentColors = await this.colorExtractorService.extractColorsFromUrl(
+      configService.get('PUBLIC_ANILIBRIA_URL') +
+        (franchiseData.image?.optimized?.preview ||
+          franchiseData.image?.preview ||
+          franchiseData.image?.optimized?.thumbnail ||
+          franchiseData.image?.thumbnail ||
+          ''),
+    );
     if (alias && !animeData.alias) animeData.alias = alias;
+    animeData.accent_colors = accentColors;
     const anime = this.animeRepository.create(animeData);
     return this.animeRepository.save(anime);
   }
@@ -416,10 +432,8 @@ export class AnimeService {
   async updateFromFranchiseData(
     existingAnime: Anime,
     franchiseData: AniLibriaFranchiseResponse,
-    alias?: string,
   ): Promise<Anime> {
     const animeData = this.mapFranchiseDataToAnime(franchiseData);
-    if (alias) animeData.alias = alias;
     Object.assign(existingAnime, animeData);
     return this.animeRepository.save(existingAnime);
   }
@@ -463,7 +477,13 @@ export class AnimeService {
       .where('anime.id::text = :idOrAlias OR anime.alias = :idOrAlias', {
         idOrAlias,
       })
-      .orderBy('animeReleases.sort_order', 'ASC');
+      .addSelect(
+        `CASE WHEN animeReleases.type = :movieType THEN 1 ELSE 0 END`,
+        'is_movie',
+      )
+      .setParameter('movieType', ReleaseType.MOVIE)
+      .orderBy('is_movie', 'ASC')
+      .addOrderBy('animeReleases.sort_order', 'ASC');
 
     const anime = await qb.getOne();
 
@@ -480,31 +500,5 @@ export class AnimeService {
     }
 
     return anime;
-  }
-
-  /**
-   * Ищет anime по названию (русскому или английскому)
-   */
-  async findByName(nameRu?: string, nameEn?: string): Promise<Anime | null> {
-    if (!nameRu && !nameEn) return null;
-
-    const queryBuilder = this.animeRepository.createQueryBuilder('anime');
-
-    if (nameRu && nameEn) {
-      queryBuilder.where(
-        'anime.name ILIKE :nameRu OR anime.name_english ILIKE :nameEn',
-        { nameRu: `%${nameRu}%`, nameEn: `%${nameEn}%` },
-      );
-    } else if (nameRu) {
-      queryBuilder.where('anime.name ILIKE :nameRu', {
-        nameRu: `%${nameRu}%`,
-      });
-    } else if (nameEn) {
-      queryBuilder.where('anime.name_english ILIKE :nameEn', {
-        nameEn: `%${nameEn}%`,
-      });
-    }
-
-    return queryBuilder.getOne();
   }
 }

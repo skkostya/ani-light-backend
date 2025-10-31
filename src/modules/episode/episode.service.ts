@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import * as dotenv from 'dotenv';
+import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { Repository } from 'typeorm';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import {
@@ -29,6 +30,7 @@ export class EpisodeService {
     private httpRetryService: HttpRetryService,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
+    private colorExtractorService: ColorExtractorService,
   ) {}
 
   async getEpisodes(animeId: string, userId?: string) {
@@ -172,6 +174,15 @@ export class EpisodeService {
       return existingEpisode;
     }
 
+    const accentColors = await this.colorExtractorService.extractColorsFromUrl(
+      configService.get('PUBLIC_ANILIBRIA_URL') +
+        (episode.preview?.optimized?.preview ||
+          episode.preview?.preview ||
+          episode.preview?.optimized?.thumbnail ||
+          episode.preview?.thumbnail ||
+          ''),
+    );
+
     // Создаем новый эпизод
     const newEpisode = this.episodeRepository.create({
       anime_release_id: animeRelease.id,
@@ -188,7 +199,12 @@ export class EpisodeService {
       ending: episode.ending || null,
       duration: episode.duration || null,
       preview_image:
-        episode.preview?.optimized?.preview || episode.preview?.preview || null,
+        episode.preview?.optimized?.preview ||
+        episode.preview?.preview ||
+        episode.preview?.optimized?.thumbnail ||
+        episode.preview?.thumbnail ||
+        null,
+      accent_colors: accentColors,
       subtitles_url: undefined, // В API расписания нет информации о субтитрах
     } as Partial<Episode>);
 
@@ -238,6 +254,16 @@ export class EpisodeService {
         continue;
       }
 
+      const accentColors =
+        await this.colorExtractorService.extractColorsFromUrl(
+          configService.get('PUBLIC_ANILIBRIA_URL') +
+            (apiEpisode.preview?.optimized?.preview ||
+              apiEpisode.preview?.preview ||
+              apiEpisode.preview?.optimized?.thumbnail ||
+              apiEpisode.preview?.thumbnail ||
+              ''),
+        );
+
       // Создаем новый эпизод
       const newEpisode = this.episodeRepository.create({
         anime_release_id: animeRelease.id,
@@ -256,7 +282,10 @@ export class EpisodeService {
         preview_image:
           apiEpisode.preview?.optimized?.preview ||
           apiEpisode.preview?.preview ||
+          apiEpisode.preview?.optimized?.thumbnail ||
+          apiEpisode.preview?.thumbnail ||
           null,
+        accent_colors: accentColors,
         subtitles_url: undefined, // В API нет информации о субтитрах
       } as Partial<Episode>);
 

@@ -5,6 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import * as dotenv from 'dotenv';
+import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
@@ -41,6 +42,7 @@ export class AnimeReleaseService {
     private httpRetryService: HttpRetryService,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
+    private colorExtractorService: ColorExtractorService,
   ) {}
 
   async syncAllAnime() {
@@ -119,8 +121,6 @@ export class AnimeReleaseService {
     );
 
     try {
-      // Получаем данные франшизы для обновления anime
-      const franchiseData = await this.getFranchiseData(release.id);
       // Обрабатываем жанры и возрастные ограничения
       const genreIds = await this.genreService.processGenresFromApi(
         release.genres || [],
@@ -196,6 +196,8 @@ export class AnimeReleaseService {
       // Обновляем связи с жанрами
       await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
 
+      // Получаем данные франшизы для обновления anime
+      const franchiseData = await this.getFranchiseData(release.id);
       // Обновляем данные anime на основе франшизы, если данные получены
       if (franchiseData) {
         await this.updateAnimeFromFranchiseData(anime, franchiseData);
@@ -242,7 +244,6 @@ export class AnimeReleaseService {
     const cachedResult =
       await this.cacheManager.get<PaginatedResponseDto<AnimeRelease>>(cacheKey);
     if (cachedResult) {
-      console.log('Returning cached anime list');
       return cachedResult;
     }
 
@@ -301,41 +302,6 @@ export class AnimeReleaseService {
     return new PaginatedResponseDto(data, total, page, limit);
   }
 
-  private async searchInApi(
-    query: GetAnimeListDto,
-    limit: number,
-  ): Promise<AniLibriaAnime[]> {
-    try {
-      // Формируем параметры запроса к API
-      const apiParams = new URLSearchParams();
-      apiParams.append('page', query.page?.toString() || '1');
-      apiParams.append('limit', limit.toString());
-
-      if (query.search) {
-        apiParams.append('search', query.search);
-      }
-      if (query.genre) {
-        // Здесь нужно будет найти ID жанра по названию
-        const genreEntity = await this.genreService.findByName(query.genre);
-        if (genreEntity) {
-          apiParams.append('f[genres]', genreEntity.external_id.toString());
-        }
-      }
-      if (query.year) {
-        apiParams.append('f[years]', query.year.toString());
-      }
-
-      const apiResponse = await this.fetchFromApi<
-        AniLibriaApiResponse<AniLibriaAnime>
-      >(`/anime/catalog/releases?${apiParams.toString()}`);
-
-      return apiResponse.data || [];
-    } catch (error) {
-      console.error('Error searching in API:', error);
-      return [];
-    }
-  }
-
   private async syncSingleAnimeFromApi(
     apiAnime: AniLibriaAnime,
   ): Promise<void> {
@@ -351,6 +317,15 @@ export class AnimeReleaseService {
           apiAnime.genres || [],
         );
         const ageRatingId = await this.processAgeRating(apiAnime.age_rating);
+        const accentColors =
+          await this.colorExtractorService.extractColorsFromUrl(
+            configService.get('PUBLIC_ANILIBRIA_URL') +
+              (apiAnime.poster?.optimized?.preview ||
+                apiAnime.poster?.preview ||
+                apiAnime.poster?.optimized?.thumbnail ||
+                apiAnime.poster?.thumbnail ||
+                ''),
+          );
 
         // Создаем новое аниме
         const animeRelease = this.animeReleaseRepo.create({
@@ -363,7 +338,10 @@ export class AnimeReleaseService {
           poster_url:
             apiAnime.poster?.optimized?.preview ||
             apiAnime.poster?.preview ||
+            apiAnime.poster?.optimized?.thumbnail ||
+            apiAnime.poster?.thumbnail ||
             '',
+          accent_colors: accentColors,
           alias: apiAnime.alias,
           is_blocked_by_geo: apiAnime.is_blocked_by_geo || false,
           is_ongoing: apiAnime.is_ongoing || false,
@@ -422,64 +400,6 @@ export class AnimeReleaseService {
           relations,
         })) ?? undefined;
 
-      if (!anime) {
-        const data = await this.fetchFromApi<AniLibriaAnime>(
-          `/anime/releases/${id}`,
-        );
-
-        // Обрабатываем жанры и ограничение по возрасту
-        const genreIds = await this.genreService.processGenresFromApi(
-          data.genres || [],
-        );
-        const ageRatingId = await this.processAgeRating(data.age_rating);
-
-        anime = this.animeReleaseRepo.create({
-          external_id: data.id,
-          title_ru: data.name.main,
-          title_en: data.name.english || '',
-          description: data.description || '',
-          year: data.year || new Date().getFullYear(),
-          poster_url:
-            data.poster?.optimized?.preview || data.poster?.preview || '',
-          alias: data.alias,
-          is_blocked_by_geo: data.is_blocked_by_geo || false,
-          is_ongoing: data.is_ongoing || false,
-          publish_day: data.publish_day
-            ? {
-                value: data.publish_day.value,
-                description: data.publish_day.description,
-              }
-            : undefined,
-          episodes_total: data.episodes_total || undefined,
-          average_duration_of_episode:
-            data.average_duration_of_episode || undefined,
-          external_created_at: data.created_at
-            ? new Date(data.created_at)
-            : undefined,
-          age_rating_id: ageRatingId,
-        });
-        await this.animeReleaseRepo.save(anime);
-
-        // Создаем связи с жанрами
-        await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
-
-        // Если есть пользователь, загружаем связь userAnime для нового аниме
-        if (userId) {
-          const animeWithUserRelation = await this.animeReleaseRepo.findOne({
-            where: { id: anime.id },
-            relations: [
-              'episodes',
-              'animeGenres',
-              'animeGenres.genre',
-              'ageRating',
-              'userAnime',
-            ],
-          });
-          if (animeWithUserRelation) {
-            anime = animeWithUserRelation;
-          }
-        }
-      }
       await this.cacheManager.set(cacheKey, anime, 3600);
     }
     return anime;
@@ -676,7 +596,6 @@ export class AnimeReleaseService {
         anime = await this.animeService.updateFromFranchiseData(
           anime,
           franchiseData,
-          firstRelease ? animeRelease.alias : undefined,
         );
         console.log(`Updated existing anime from franchise: ${anime.name}`);
       }

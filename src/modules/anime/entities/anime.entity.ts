@@ -1,4 +1,5 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import type { ExtractedColors } from '../../../common/services/color-extractor.service';
 import { AnimeRelease } from '../../anime-release/entities/anime-release.entity';
 import { UserAnime } from '../../user/entities/user-anime.entity';
 
@@ -42,6 +43,9 @@ export class Anime {
 
   @Column({ default: 0 })
   total_duration_in_seconds: number;
+
+  @Column('jsonb', { nullable: true })
+  accent_colors?: ExtractedColors;
 
   // Связь с anime-release (один anime может иметь много anime-release)
   @OneToMany(() => AnimeRelease, (animeRelease) => animeRelease.anime)

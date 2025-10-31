@@ -6,6 +6,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { ExtractedColors } from '../../../common/services/color-extractor.service';
 import { AnimeRelease } from '../../anime-release/entities/anime-release.entity';
 
 // Интерфейсы для типизации связей
@@ -93,6 +94,9 @@ export class Episode {
   // Превью изображение эпизода
   @Column({ nullable: true })
   preview_image?: string;
+
+  @Column('jsonb', { nullable: true })
+  accent_colors?: ExtractedColors;
 
   @OneToMany('UserEpisode', 'episode')
   userEpisodes: UserEpisodeRelation[];

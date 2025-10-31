@@ -6,6 +6,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { ExtractedColors } from '../../../common/services/color-extractor.service';
 import { Anime } from '../../anime/entities/anime.entity';
 import { AgeRating } from '../../dictionaries/entities/age-rating.entity';
 import { Episode } from '../../episode/entities/episode.entity';
@@ -104,6 +105,9 @@ export class AnimeRelease {
 
   @Column({ default: 0 })
   sort_order: number;
+
+  @Column('jsonb', { nullable: true })
+  accent_colors?: ExtractedColors;
 
   @ManyToOne(() => Anime, (anime) => anime.animeReleases, { nullable: true })
   @JoinColumn({ name: 'anime_id' })
