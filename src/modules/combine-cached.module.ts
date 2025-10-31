@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as redisStore from 'cache-manager-redis-store';
+import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
 import { OptionalUserGuard } from '../common/guards/optional-user.guard';
 import { HttpRetryService } from '../common/services/http-retry.service';
@@ -78,6 +79,7 @@ const SERVICES = [
   HttpRetryService,
   SecurityAuditService,
   OptionalUserGuard,
+  ColorExtractorService,
 ];
 
 const CONTROLLERS = [

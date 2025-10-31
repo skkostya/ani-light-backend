@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { redisStore } from 'cache-manager-redis-store';
+import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { HttpRetryService } from 'src/common/services/http-retry.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
 import { OptionalUserGuard } from '../common/guards/optional-user.guard';
@@ -57,6 +58,7 @@ const SERVICES = [
   HttpRetryService,
   SecurityAuditService,
   OptionalUserGuard,
+  ColorExtractorService,
 ];
 
 const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
