@@ -27,11 +27,11 @@ import { AgeRatingService } from '../services/age-rating.service';
 
 @ApiTags('dictionaries')
 @Controller('age-ratings')
-@UseGuards(JwtAuthGuard)
 export class AgeRatingController {
   constructor(private readonly ageRatingService: AgeRatingService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Создать возрастной рейтинг',
     description: 'Создает новый возрастной рейтинг в справочнике',
@@ -73,12 +73,6 @@ export class AgeRatingController {
     description: 'Список возрастных рейтингов успешно получен',
     type: [AgeRatingResponseDto],
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
   findAll() {
     return this.ageRatingService.findAll();
   }
@@ -100,20 +94,15 @@ export class AgeRatingController {
     type: AgeRatingResponseDto,
   })
   @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiResponse({
     status: 404,
     description: 'Возрастной рейтинг не найден',
   })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
   findOne(@Param('id') id: string) {
     return this.ageRatingService.findOne(id);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Обновить возрастной рейтинг',
     description: 'Обновляет информацию о возрастном рейтинге',
@@ -159,6 +148,7 @@ export class AgeRatingController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Удалить возрастной рейтинг',
     description: 'Удаляет возрастной рейтинг из справочника',

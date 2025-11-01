@@ -27,11 +27,11 @@ import { GenreService } from '../services/genre.service';
 
 @ApiTags('dictionaries')
 @Controller('genres')
-@UseGuards(JwtAuthGuard)
 export class GenreController {
   constructor(private readonly genreService: GenreService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Создать жанр',
     description: 'Создает новый жанр в справочнике',
@@ -73,12 +73,6 @@ export class GenreController {
     description: 'Список жанров успешно получен',
     type: [GenreResponseDto],
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
   findAll() {
     return this.genreService.findAll();
   }
@@ -100,20 +94,15 @@ export class GenreController {
     type: GenreResponseDto,
   })
   @ApiResponse({
-    status: 401,
-    description: 'Необходима аутентификация',
-  })
-  @ApiResponse({
     status: 404,
     description: 'Жанр не найден',
   })
-  @ApiBearerAuth('JWT-auth')
-  @ApiCookieAuth('access_token')
   findOne(@Param('id') id: string) {
     return this.genreService.findOne(id);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Обновить жанр',
     description: 'Обновляет информацию о жанре',
@@ -156,6 +145,7 @@ export class GenreController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Удалить жанр',
     description: 'Удаляет жанр из справочника',
