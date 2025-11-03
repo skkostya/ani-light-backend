@@ -14,7 +14,6 @@ import { CombineCachedModule } from './modules/combine-cached.module';
 import { CombineModule } from './modules/combine.module';
 import { HealthModule } from './modules/health/health.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
-import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -81,11 +80,13 @@ import { UserModule } from './modules/user/user.module';
       inject: [ConfigService],
     }),
 
+    // Глобальная настройка JWT для всего приложения
     JwtModule.registerAsync({
       imports: [ConfigModule],
+      global: true,
       useFactory: (config: ConfigService) => ({
         secret: config.get('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '7d' },
       }),
       inject: [ConfigService],
     }),
@@ -93,7 +94,6 @@ import { UserModule } from './modules/user/user.module';
     CombineCachedModule,
     CombineModule,
     HealthModule,
-    UserModule,
     MetricsModule,
   ],
   controllers: [AppController],

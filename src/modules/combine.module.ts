@@ -1,12 +1,12 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { redisStore } from 'cache-manager-redis-store';
 import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { HttpRetryService } from 'src/common/services/http-retry.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
+import { JwtStrategy } from 'src/common/strategies/jwt.strategy';
 import { OptionalUserGuard } from '../common/guards/optional-user.guard';
 import { AnimeReleaseGenreService } from './anime-release/anime-release-genre.service';
 import { AnimeReleaseService } from './anime-release/anime-release.service';
@@ -27,10 +27,12 @@ import { EpisodeComment } from './episode/entities/episode-comment.entity';
 import { EpisodeRating } from './episode/entities/episode-rating.entity';
 import { Episode } from './episode/entities/episode.entity';
 import { EpisodeService } from './episode/episode.service';
+import { TelegramBotService } from './telegram/services/telegram-bot.service';
+import { TelegramService } from './telegram/services/telegram.service';
 import { UserAnime } from './user/entities/user-anime.entity';
 import { UserEpisode } from './user/entities/user-episode.entity';
 import { User } from './user/entities/user.entity';
-import { UserModule } from './user/user.module';
+import { UserService } from './user/user.service';
 
 const ENTITIES = [
   Anime,
@@ -59,6 +61,10 @@ const SERVICES = [
   SecurityAuditService,
   OptionalUserGuard,
   ColorExtractorService,
+  TelegramService,
+  TelegramBotService,
+  UserService,
+  JwtStrategy,
 ];
 
 const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
@@ -66,15 +72,7 @@ const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
 @Module({
   imports: [
     TypeOrmModule.forFeature(ENTITIES),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
-      }),
-      inject: [ConfigService],
-    }),
-    UserModule,
+    PassportModule,
     CacheModule.register({
       store: redisStore,
       host: process.env.REDIS_HOST || 'localhost',

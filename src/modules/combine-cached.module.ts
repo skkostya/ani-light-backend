@@ -1,12 +1,12 @@
 import { HttpModule } from '@nestjs/axios';
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as redisStore from 'cache-manager-redis-store';
 import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
+import { JwtStrategy } from 'src/common/strategies/jwt.strategy';
 import { OptionalUserGuard } from '../common/guards/optional-user.guard';
 import { HttpRetryService } from '../common/services/http-retry.service';
 import { ProfanityFilterService } from '../common/services/profanity-filter.service';
@@ -35,6 +35,7 @@ import { EpisodeRatingController } from './episode/episode-rating.controller';
 import { EpisodeRatingService } from './episode/episode-rating.service';
 import { EpisodeController } from './episode/episode.controller';
 import { EpisodeService } from './episode/episode.service';
+import { TelegramService } from './telegram/services/telegram.service';
 import { UserAnime } from './user/entities/user-anime.entity';
 import { UserEpisode } from './user/entities/user-episode.entity';
 import { User } from './user/entities/user.entity';
@@ -43,7 +44,7 @@ import { UserAnimeService } from './user/user-anime.service';
 import { UserEpisodeController } from './user/user-episode.controller';
 import { UserEpisodeService } from './user/user-episode.service';
 import { UserNotificationsController } from './user/user-notifications.controller';
-import { UserModule } from './user/user.module';
+import { UserController } from './user/user.controller';
 import { UserService } from './user/user.service';
 
 const ENTITIES = [
@@ -80,12 +81,15 @@ const SERVICES = [
   SecurityAuditService,
   OptionalUserGuard,
   ColorExtractorService,
+  TelegramService,
+  JwtStrategy,
 ];
 
 const CONTROLLERS = [
   AnimeController,
   AnimeReleaseController,
   EpisodeController,
+  UserController,
   UserAnimeController,
   UserEpisodeController,
   UserNotificationsController,
@@ -98,15 +102,7 @@ const CONTROLLERS = [
   imports: [
     TypeOrmModule.forFeature(ENTITIES),
     HttpModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
-      }),
-      inject: [ConfigService],
-    }),
-    UserModule,
+    PassportModule,
     CacheModule.register({
       store: redisStore,
       host: process.env.REDIS_HOST || 'localhost',

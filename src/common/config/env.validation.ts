@@ -30,6 +30,8 @@ export const envValidationSchema = Joi.object({
 
   // Telegram (опционально)
   TELEGRAM_BOT_TOKEN: Joi.string().optional(),
+  TELEGRAM_BOT_SECRET: Joi.string().optional(),
+  TELEGRAM_USE_WEBHOOK: Joi.string().valid('true', 'false').optional(),
 
   // Дополнительные настройки (опционально)
   CORS_ORIGIN: Joi.string().optional(),
