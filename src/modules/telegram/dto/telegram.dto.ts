@@ -37,4 +37,3 @@ export interface TelegramChat {
   username?: string;
   photo_url?: string;
 }
-

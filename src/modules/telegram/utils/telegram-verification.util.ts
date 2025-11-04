@@ -1,5 +1,5 @@
-import { UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { UnauthorizedException } from '@nestjs/common';
 import {
   TelegramChat,
   TelegramInitData,

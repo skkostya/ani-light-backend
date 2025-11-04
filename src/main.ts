@@ -64,11 +64,20 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = ['http://localhost:3004', 'https://anilight.net'];
   app.enableCors({
-    origin: 'http://localhost:3004', // URL фронтенда
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true, // ВАЖНО: разрешаем cookies
-    methods: 'GET,POST,PUT,DELETE',
-    allowedHeaders: 'Content-Type,Authorization',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   }); // CORS для фронта с поддержкой cookies
 
   // Swagger документация
