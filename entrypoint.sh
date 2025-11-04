@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-yarn typeorm:up || {
+npx typeorm-ts-node-commonjs migration:run -d dist/database/data-source.js || {
   echo "❌ Migration failed!"
   exit 1
 }
