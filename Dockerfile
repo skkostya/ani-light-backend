@@ -40,14 +40,15 @@ COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 # Создаем директорию для логов
 RUN mkdir -p logs && chown -R nestjs:nodejs logs
 
+# Копируем entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Переключаемся на непривилегированного пользователя
 USER nestjs
 
 # Открываем порт
 EXPOSE 3001
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
