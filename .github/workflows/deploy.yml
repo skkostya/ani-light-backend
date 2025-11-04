@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd ~/ani-light
+            cd /srv/ani-light
             # optionally update .env from secret (if you store one)
             if [ -n "${{ secrets.SERVER_ENV }}" ]; then
               echo "${{ secrets.SERVER_ENV }}" > .env
