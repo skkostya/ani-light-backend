@@ -64,17 +64,8 @@ async function bootstrap() {
     }),
   );
 
-  const allowedOrigins = ['http://localhost:3004', 'https://anilight.net'];
   app.enableCors({
-    origin: (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'), false);
-    },
+    origin: ['http://localhost:3004', 'https://anilight.net'],
     credentials: true, // ВАЖНО: разрешаем cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -120,14 +111,9 @@ API поддерживает два способа аутентификации:
 - Валидация данных на уровне DTO`,
     )
     .setVersion('1.0.0')
-    .setContact(
-      'Ani-Light Team',
-      'https://github.com/ani-light',
-      'support@ani-light.com',
-    )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .addServer('http://localhost:3001', 'Development server')
-    .addServer('https://api.ani-light.com', 'Production server')
+    .addServer('https://anilight.net', 'Production server')
     .addTag('auth', 'Аутентификация и авторизация пользователей')
     .addTag('anime', 'Управление аниме контентом и рейтингами')
     .addTag('episodes', 'Управление эпизодами, комментариями и рейтингами')
