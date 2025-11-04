@@ -113,7 +113,7 @@ API поддерживает два способа аутентификации:
     .setVersion('1.0.0')
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .addServer('http://localhost:3001', 'Development server')
-    .addServer('https://anilight.net', 'Production server')
+    .addServer('https://anilight.net/api', 'Production server')
     .addTag('auth', 'Аутентификация и авторизация пользователей')
     .addTag('anime', 'Управление аниме контентом и рейтингами')
     .addTag('episodes', 'Управление эпизодами, комментариями и рейтингами')
