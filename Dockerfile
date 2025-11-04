@@ -1,7 +1,7 @@
 # 🐳 Multi-stage Dockerfile для Ani-Light Backend
 
 # 🏗️ Стадия сборки
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ COPY . .
 RUN yarn build
 
 # 🚀 Стадия продакшена
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Создаем пользователя для безопасности
 RUN addgroup -g 1001 -S nodejs
