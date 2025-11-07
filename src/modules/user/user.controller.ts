@@ -11,7 +11,7 @@ import {
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response as ExpressResponse } from 'express';
-import { OptionalJwtGuard } from '../../common/guards/optional-jwt.guard';
+import { OptionalUserGuard } from 'src/common/guards/optional-user.guard';
 import { CreateTelegramUserDto, CreateUserDto, LoginDto } from './dto/user.dto';
 import { UserService } from './user.service';
 
@@ -162,7 +162,7 @@ export class UserController {
       ],
     },
   })
-  @UseGuards(OptionalJwtGuard)
+  @UseGuards(OptionalUserGuard)
   getProfile(@Request() req: any) {
     // Если пользователь не аутентифицирован, возвращаем информацию об этом
     if (!req.user) {
