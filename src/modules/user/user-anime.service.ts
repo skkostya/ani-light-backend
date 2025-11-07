@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { Episode } from '../episode/entities/episode.entity';
 import {
@@ -198,7 +198,7 @@ export class UserAnimeService {
    */
   async getCurrentlyWatchingAnime(userId: string): Promise<UserAnime[]> {
     return this.userAnimeRepository.find({
-      where: { user_id: userId, is_watching: true },
+      where: { user_id: userId, last_watched_at: Not(IsNull()) },
       relations: [
         'anime',
         'lastWatchedEpisode',
@@ -238,8 +238,12 @@ export class UserAnimeService {
   ): Promise<NextEpisodeResponseDto[]> {
     // Получаем все просматриваемые аниме
     const watchingAnime = await this.userAnimeRepository.find({
-      where: { user_id: userId, is_watching: true },
+      where: {
+        user_id: userId,
+        last_watched_at: Not(IsNull()),
+      },
       relations: ['anime'],
+      order: { last_watched_at: 'DESC' },
     });
 
     const result: NextEpisodeResponseDto[] = [];
