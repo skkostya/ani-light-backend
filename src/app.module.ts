@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
@@ -28,6 +29,9 @@ import { MetricsModule } from './modules/metrics/metrics.module';
 
     // Логирование
     WinstonModule.forRoot(winstonConfig),
+
+    // Планировщик задач (Cron)
+    ScheduleModule.forRoot(),
 
     // Метрики Prometheus
     PrometheusModule.register({

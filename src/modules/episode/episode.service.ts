@@ -66,7 +66,11 @@ export class EpisodeService {
       episodes = await qb.getMany();
 
       // Если эпизодов нет в базе данных, запрашиваем их с AniLibria API
-      if (episodes.length === 0 && animeRelease.external_id) {
+      if (
+        (episodes.length === 0 ||
+          episodes.length !== animeRelease.episodes_total) &&
+        animeRelease.external_id
+      ) {
         try {
           const apiResponse = await this.fetchReleaseFromApi(
             animeRelease.external_id,
