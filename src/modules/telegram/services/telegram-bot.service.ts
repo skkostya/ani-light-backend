@@ -249,24 +249,6 @@ export class TelegramBotService implements OnModuleInit {
   }
 
   /**
-   * Генерация URL для авторизации через WebApp
-   * @param telegramId - Telegram ID пользователя
-   */
-  private generateAuthUrl(telegramId: string): string {
-    // Создаем URL для WebApp
-    // Фронтенд должен:
-    // 1. Получить initData из window.Telegram.WebApp.initData
-    // 2. Отправить его на /auth/telegram с initData или telegram_id
-    const params = new URLSearchParams({
-      telegram_id: telegramId,
-      source: 'bot',
-      auto_auth: 'true', // Флаг для автоматической авторизации
-    });
-
-    return `${this.frontendUrl}/auth/telegram?${params.toString()}`;
-  }
-
-  /**
    * Генерация URL фронтенда с временным токеном для обмена на бекенде
    */
   private generateAuthUrlWithTempToken(tempToken: string): string {
@@ -275,7 +257,7 @@ export class TelegramBotService implements OnModuleInit {
       auto_auth: 'true',
       temp_token: tempToken,
     });
-    return `${this.frontendUrl}/auth/telegram?${params.toString()}`;
+    return `${this.frontendUrl}/ru/auth/telegram?${params.toString()}`;
   }
 
   /**
