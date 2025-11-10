@@ -2,7 +2,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { redisStore } from 'cache-manager-redis-store';
+import * as redisStore from 'cache-manager-redis-store';
 import { ColorExtractorService } from 'src/common/services/color-extractor.service';
 import { HttpRetryService } from 'src/common/services/http-retry.service';
 import { SecurityAuditService } from 'src/common/services/security-audit.service';
@@ -79,11 +79,38 @@ const CONTROLLERS = [
   imports: [
     TypeOrmModule.forFeature(ENTITIES),
     PassportModule,
-    CacheModule.register({
-      store: redisStore,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      ttl: 3600, // Кэш на 1 час
+    CacheModule.registerAsync({
+      useFactory: () => {
+        const redisHost = process.env.REDIS_HOST || 'localhost';
+        const redisPort = process.env.REDIS_PORT || 6379;
+        const useRedis = process.env.REDIS_ENABLED !== 'false';
+
+        // Если Redis отключен, используем in-memory cache
+        if (!useRedis) {
+          return {
+            ttl: 3600, // Кэш на 1 час
+          } as any;
+        }
+
+        // Используем Redis с опциями для предотвращения блокировки
+        return {
+          store: redisStore as any,
+          host: redisHost,
+          port: Number(redisPort),
+          ttl: 3600, // Кэш на 1 час
+          // Опции для предотвращения блокировки при недоступности Redis
+          retryStrategy: (times: number) => {
+            if (times > 3) {
+              // После 3 попыток переключаемся на in-memory
+              return null;
+            }
+            return Math.min(times * 50, 2000);
+          },
+          maxRetriesPerRequest: 3,
+          enableReadyCheck: false, // Не проверяем готовность при старте
+          lazyConnect: true, // Подключаемся лениво
+        } as any;
+      },
     }),
   ],
   controllers: CONTROLLERS,

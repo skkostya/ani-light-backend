@@ -8,8 +8,11 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
+  console.log('🚀 Starting application bootstrap...');
   const app = await NestFactory.create(AppModule);
+  console.log('✅ AppModule created successfully');
 
+  console.log('📦 Setting up middleware...');
   // Парсинг cookies
   app.use(cookieParser());
 
@@ -174,7 +177,10 @@ API поддерживает два способа аутентификации:
     `,
   });
 
-  await app.listen(process.env.PORT ?? 3001, '0.0.0.0');
+  const port = process.env.PORT ?? 3001;
+  console.log(`🌐 Starting server on port ${port}...`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`✅ Application is running on: http://0.0.0.0:${port}`);
 
   // Graceful shutdown
   process.on('SIGTERM', () => {

@@ -80,6 +80,12 @@ import { MetricsModule } from './modules/metrics/metrics.module';
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         synchronize: false,
         logging: true, // Для отладки
+        // Опции для предотвращения блокировки при подключении
+        connectTimeoutMS: 10000, // 10 секунд таймаут на подключение
+        extra: {
+          max: 10, // Максимум соединений в пуле
+          connectionTimeoutMillis: 10000, // Таймаут подключения
+        },
       }),
       inject: [ConfigService],
     }),

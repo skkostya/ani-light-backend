@@ -31,6 +31,17 @@ export class TelegramBotService implements OnModuleInit {
       return;
     }
 
+    // Запускаем бота асинхронно, не блокируя старт приложения
+    this.initializeBot(botToken).catch((error) => {
+      this.logger.error('Критическая ошибка при инициализации Telegram бота:', error);
+      // Не прерываем запуск приложения, даже если бот не запустился
+    });
+  }
+
+  /**
+   * Асинхронная инициализация бота (не блокирует запуск приложения)
+   */
+  private async initializeBot(botToken: string): Promise<void> {
     try {
       this.bot = new Telegraf(botToken);
       this.setupHandlers();
@@ -41,7 +52,13 @@ export class TelegramBotService implements OnModuleInit {
 
       if (!useWebhook) {
         // Используем polling для получения обновлений (для разработки)
-        await this.bot.launch();
+        // Запускаем с таймаутом, чтобы не блокировать старт приложения
+        await Promise.race([
+          this.bot.launch(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout запуска бота')), 10000),
+          ),
+        ]);
         this.logger.log('Telegram бот успешно запущен (polling режим)');
       } else {
         this.logger.log('Telegram бот настроен на использование webhook');
@@ -52,6 +69,7 @@ export class TelegramBotService implements OnModuleInit {
       process.once('SIGTERM', () => this.bot?.stop('SIGTERM'));
     } catch (error) {
       this.logger.error('Ошибка при запуске Telegram бота:', error);
+      // Не пробрасываем ошибку дальше, чтобы не блокировать запуск приложения
     }
   }
 
