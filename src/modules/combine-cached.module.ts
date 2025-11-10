@@ -35,6 +35,8 @@ import { EpisodeRatingController } from './episode/episode-rating.controller';
 import { EpisodeRatingService } from './episode/episode-rating.service';
 import { EpisodeController } from './episode/episode.controller';
 import { EpisodeService } from './episode/episode.service';
+import { TelegramBotController } from './telegram/controllers/telegram-bot.controller';
+import { TelegramBotService } from './telegram/services/telegram-bot.service';
 import { TelegramService } from './telegram/services/telegram.service';
 import { UserAnime } from './user/entities/user-anime.entity';
 import { UserEpisode } from './user/entities/user-episode.entity';
@@ -82,6 +84,7 @@ const SERVICES = [
   OptionalUserGuard,
   ColorExtractorService,
   TelegramService,
+  TelegramBotService,
   JwtStrategy,
 ];
 
@@ -96,6 +99,7 @@ const CONTROLLERS = [
   EpisodeCommentController,
   EpisodeRatingController,
   AnimeReleaseRatingController,
+  TelegramBotController,
 ];
 
 @Module({

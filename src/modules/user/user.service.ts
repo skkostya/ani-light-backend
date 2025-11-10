@@ -3,14 +3,16 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
+import * as dotenv from 'dotenv';
 import { Repository } from 'typeorm';
-import { SecurityAuditService } from '../../common/services/security-audit.service';
 import { TelegramService } from '../telegram/services/telegram.service';
 import { UpdateUserNotificationsDto } from './dto/user-notifications.dto';
 import {
+  // DTOs для стандартной аутентификации
   CreateTelegramUserDto,
   CreateUserDto,
   JwtPayloadDto,
@@ -19,13 +21,15 @@ import {
 } from './dto/user.dto';
 import { AuthType, User } from './entities/user.entity';
 
+dotenv.config();
+const configService = new ConfigService();
+
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
-    private securityAuditService: SecurityAuditService,
     private telegramService: TelegramService,
   ) {}
 
@@ -339,6 +343,44 @@ export class UserService {
       user: this.toUserResponse(user),
       access_token,
     };
+  }
+
+  /**
+   * Выпуск краткоживущего временного токена для Telegram-флоу.
+   * Токен содержит только telegram_id и маркер типа.
+   */
+  issueTelegramTemporaryToken(telegramId: string): string {
+    // Короткий TTL для безопасности
+    const tempPayload = {
+      telegram_id: telegramId,
+      token_type: configService.get('TELEGARM_TEMP_TOKEN_TYPE'),
+    };
+    return this.jwtService.sign(tempPayload, { expiresIn: '5m' });
+  }
+
+  /**
+   * Обмен временного токена (из Mini App/бота) на обычный JWT токен пользователя.
+   * Валидирует временный токен, получает пользователя по telegram_id и выдает стандартный access_token.
+   */
+  async exchangeTelegramTemporaryToken(
+    temporaryToken: string,
+  ): Promise<{ user: UserResponseDto; access_token: string }> {
+    try {
+      const decoded: any = this.jwtService.verify(temporaryToken);
+
+      if (
+        !decoded?.telegram_id ||
+        decoded?.token_type !== configService.get('TELEGARM_TEMP_TOKEN_TYPE')
+      ) {
+        throw new UnauthorizedException('Недействительный временный токен');
+      }
+
+      // Авторизуем пользователя по telegram_id (пользователь должен существовать и быть активным)
+      const telegramId = String(decoded.telegram_id);
+      return this.loginTelegramUser(telegramId);
+    } catch {
+      throw new UnauthorizedException('Временный токен невалиден или истек');
+    }
   }
 
   private toUserResponse(user: User): UserResponseDto {

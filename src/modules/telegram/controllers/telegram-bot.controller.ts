@@ -1,12 +1,16 @@
-import { Controller, Logger, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Logger, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import { UserService } from '../../user/user.service';
+import { ExchangeTelegramTokenDto } from '../dto/exchange-telegram-token.dto';
 import { TelegramBotService } from '../services/telegram-bot.service';
 
 /**
  * Контроллер для обработки webhook от Telegram
  * Используется вместо polling в production
  */
+@ApiTags('telegram')
 @Controller('telegram')
 export class TelegramBotController {
   private readonly logger = new Logger(TelegramBotController.name);
@@ -15,6 +19,7 @@ export class TelegramBotController {
   constructor(
     private readonly telegramBotService: TelegramBotService,
     private readonly configService: ConfigService,
+    private readonly userService: UserService,
   ) {
     this.botSecret =
       this.configService.get<string>('TELEGRAM_BOT_SECRET') || '';
@@ -77,5 +82,56 @@ export class TelegramBotController {
         message: error.message,
       });
     }
+  }
+
+  /**
+   * Обмен временного токена (из Telegram Mini App/бота) на обычный JWT токен
+   */
+  @Post('auth/exchange')
+  @ApiOperation({
+    summary: 'Обмен временного токена Telegram на JWT',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Возвращает пользователя и access_token',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Временный токен невалиден или истек',
+  })
+  async exchangeTemporaryToken(
+    @Body() body: ExchangeTelegramTokenDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.userService.exchangeTelegramTemporaryToken(
+        body.temp_token,
+      );
+
+      this.setAuthCookie(res, result.access_token);
+
+      return res.json({
+        user: result.user,
+        message: 'Вход выполнен успешно',
+      });
+    } catch (error) {
+      this.logger.warn('Ошибка обмена временного токена:', error?.message);
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+  }
+
+  /**
+   * Устанавливает JWT токен в httpOnly cookie
+   */
+  private setAuthCookie(res: Response, token: string) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.cookie('access_token', token, {
+      httpOnly: true, // Защищает от XSS атак
+      secure: isProduction, // HTTPS только в продакшене
+      sameSite: 'strict', // Защищает от CSRF атак
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней (как в JWT)
+      path: '/', // Доступен для всего сайта
+    });
   }
 }

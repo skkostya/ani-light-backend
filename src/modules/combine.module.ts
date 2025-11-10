@@ -27,6 +27,7 @@ import { EpisodeComment } from './episode/entities/episode-comment.entity';
 import { EpisodeRating } from './episode/entities/episode-rating.entity';
 import { Episode } from './episode/entities/episode.entity';
 import { EpisodeService } from './episode/episode.service';
+import { TelegramBotController } from './telegram/controllers/telegram-bot.controller';
 import { TelegramBotService } from './telegram/services/telegram-bot.service';
 import { TelegramService } from './telegram/services/telegram.service';
 import { UserAnime } from './user/entities/user-anime.entity';
@@ -67,7 +68,12 @@ const SERVICES = [
   JwtStrategy,
 ];
 
-const CONTROLLERS = [AgeRatingController, GenreController, AnimeController];
+const CONTROLLERS = [
+  AgeRatingController,
+  GenreController,
+  AnimeController,
+  TelegramBotController,
+];
 
 @Module({
   imports: [

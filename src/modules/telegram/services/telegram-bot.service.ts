@@ -121,40 +121,39 @@ export class TelegramBotService implements OnModuleInit {
       const userId = ctx.from?.id;
       const username =
         ctx.from?.username || ctx.from?.first_name || 'пользователь';
+      const firstName = ctx.from?.first_name;
+      const lastName = ctx.from?.last_name;
 
       if (!userId) {
         await ctx.reply('Не удалось получить данные пользователя.');
         return;
       }
 
-      // Проверяем, зарегистрирован ли пользователь
-      let isRegistered = false;
-      try {
-        await this.userService.loginTelegramUser(userId.toString());
-        isRegistered = true;
-      } catch {
-        // Пользователь не зарегистрирован - это нормально
-        isRegistered = false;
-      }
+      // Регистрируем пользователя (если его еще нет) или обновляем данные
+      await this.userService.registerTelegramUser({
+        telegram_id: userId.toString(),
+        username: username || `user_${userId}`,
+        first_name: firstName,
+        last_name: lastName,
+      });
 
-      const message = isRegistered
-        ? `👋 Привет, ${username}!\n\n` +
-          `Вы уже зарегистрированы в системе. Нажмите кнопку ниже, чтобы открыть платформу.`
-        : `👋 Привет, ${username}!\n\n` +
-          `Добро пожаловать в Ani-Light!\n\n` +
-          `Нажмите кнопку ниже, чтобы зарегистрироваться и открыть платформу.`;
+      const message =
+        `👋 Привет, ${username}!\n\n` +
+        `Вы успешно авторизованы. Нажмите кнопку ниже, чтобы открыть платформу.`;
 
-      // Создаем кнопку для авторизации
-      const authUrl = this.generateAuthUrl(userId.toString());
+      // Генерируем краткоживущий временный токен для обмена на бекенде
+      const tempToken = this.userService.issueTelegramTemporaryToken(
+        userId.toString(),
+      );
+      // Создаем кнопку для открытия платформы с временным токеном
+      const authUrl = this.generateAuthUrlWithTempToken(tempToken);
 
       await ctx.reply(message, {
         reply_markup: {
           inline_keyboard: [
             [
               {
-                text: isRegistered
-                  ? '🚀 Открыть платформу'
-                  : '🚀 Зарегистрироваться',
+                text: '🚀 Открыть платформу',
                 web_app: { url: authUrl },
               },
             ],
@@ -204,13 +203,29 @@ export class TelegramBotService implements OnModuleInit {
   private async handleAuthButton(ctx: Context) {
     try {
       const userId = ctx.from?.id;
+      const username =
+        ctx.from?.username || ctx.from?.first_name || `user_${userId}`;
+      const firstName = ctx.from?.first_name;
+      const lastName = ctx.from?.last_name;
 
       if (!userId) {
         await ctx.answerCbQuery('Не удалось получить данные пользователя.');
         return;
       }
 
-      const authUrl = this.generateAuthUrl(userId.toString());
+      // Регистрируем пользователя (если его еще нет) или обновляем данные
+      await this.userService.registerTelegramUser({
+        telegram_id: userId.toString(),
+        username,
+        first_name: firstName,
+        last_name: lastName,
+      });
+
+      // Генерируем временный токен и формируем URL
+      const tempToken = this.userService.issueTelegramTemporaryToken(
+        userId.toString(),
+      );
+      const authUrl = this.generateAuthUrlWithTempToken(tempToken);
 
       await ctx.answerCbQuery('Открываем платформу...');
 
@@ -252,19 +267,28 @@ export class TelegramBotService implements OnModuleInit {
   }
 
   /**
+   * Генерация URL фронтенда с временным токеном для обмена на бекенде
+   */
+  private generateAuthUrlWithTempToken(tempToken: string): string {
+    const params = new URLSearchParams({
+      source: 'bot',
+      auto_auth: 'true',
+      temp_token: tempToken,
+    });
+    return `${this.frontendUrl}/auth/telegram?${params.toString()}`;
+  }
+
+  /**
    * Генерация временного токена для быстрой авторизации
    * Можно использовать для одноразовой авторизации через ссылку
    */
   async generateAuthToken(telegramId: string): Promise<string> {
     try {
-      // Пытаемся найти пользователя
+      // Пытаемся залогинить по telegram_id
       const authResult = await this.userService.loginTelegramUser(telegramId);
-
-      // Возвращаем JWT токен
       return authResult.access_token;
     } catch {
-      // Если пользователь не зарегистрирован, возвращаем null
-      // Фронтенд должен будет зарегистрировать пользователя
+      // Если пользователь не зарегистрирован, возвращаем пустую строку
       return '';
     }
   }
