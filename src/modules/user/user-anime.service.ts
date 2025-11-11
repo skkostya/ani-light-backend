@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
+import { Anime } from '../anime/entities/anime.entity';
 import { Episode } from '../episode/entities/episode.entity';
 import {
   CreateUserAnimeDto,
@@ -22,6 +23,8 @@ export class UserAnimeService {
   constructor(
     @InjectRepository(UserAnime)
     private userAnimeRepository: Repository<UserAnime>,
+    @InjectRepository(Anime)
+    private animeRepository: Repository<Anime>,
     private userEpisodeService: UserEpisodeService,
   ) {}
 
@@ -29,6 +32,17 @@ export class UserAnimeService {
     userId: string,
     createDto: CreateUserAnimeDto,
   ): Promise<UserAnime> {
+    // Проверяем существование аниме
+    const anime = await this.animeRepository.findOne({
+      where: { id: createDto.anime_id },
+    });
+
+    if (!anime) {
+      throw new NotFoundException(
+        `Аниме с ID ${createDto.anime_id} не найдено`,
+      );
+    }
+
     // Проверяем, не существует ли уже связь
     const existing = await this.userAnimeRepository.findOne({
       where: { user_id: userId, anime_id: createDto.anime_id },
@@ -160,6 +174,15 @@ export class UserAnimeService {
   }
 
   async toggleFavorite(userId: string, animeId: string): Promise<UserAnime> {
+    // Проверяем существование аниме перед созданием связи
+    const anime = await this.animeRepository.findOne({
+      where: { id: animeId },
+    });
+
+    if (!anime) {
+      throw new NotFoundException(`Аниме с ID ${animeId} не найдено`);
+    }
+
     const userAnime = await this.userAnimeRepository.findOne({
       where: { user_id: userId, anime_id: animeId },
     });
@@ -177,6 +200,15 @@ export class UserAnimeService {
   }
 
   async toggleWantToWatch(userId: string, animeId: string): Promise<UserAnime> {
+    // Проверяем существование аниме перед созданием связи
+    const anime = await this.animeRepository.findOne({
+      where: { id: animeId },
+    });
+
+    if (!anime) {
+      throw new NotFoundException(`Аниме с ID ${animeId} не найдено`);
+    }
+
     const userAnime = await this.userAnimeRepository.findOne({
       where: { user_id: userId, anime_id: animeId },
     });

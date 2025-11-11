@@ -21,7 +21,7 @@ export class TelegramBotService implements OnModuleInit {
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
   }
 
-  async onModuleInit() {
+  onModuleInit() {
     const botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
 
     if (!botToken) {
@@ -33,7 +33,10 @@ export class TelegramBotService implements OnModuleInit {
 
     // Запускаем бота асинхронно, не блокируя старт приложения
     this.initializeBot(botToken).catch((error) => {
-      this.logger.error('Критическая ошибка при инициализации Telegram бота:', error);
+      this.logger.error(
+        'Критическая ошибка при инициализации Telegram бота:',
+        error,
+      );
       // Не прерываем запуск приложения, даже если бот не запустился
     });
   }
