@@ -16,6 +16,7 @@ import {
   UpdateUserAnimeDto,
 } from './dto/user-anime.dto';
 import { UserAnime } from './entities/user-anime.entity';
+import { User } from './entities/user.entity';
 import { UserEpisodeService } from './user-episode.service';
 
 @Injectable()
@@ -25,6 +26,8 @@ export class UserAnimeService {
     private userAnimeRepository: Repository<UserAnime>,
     @InjectRepository(Anime)
     private animeRepository: Repository<Anime>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private userEpisodeService: UserEpisodeService,
   ) {}
 
@@ -32,6 +35,15 @@ export class UserAnimeService {
     userId: string,
     createDto: CreateUserAnimeDto,
   ): Promise<UserAnime> {
+    // Проверяем существование пользователя
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`Пользователь с ID ${userId} не найден`);
+    }
+
     // Проверяем существование аниме
     const anime = await this.animeRepository.findOne({
       where: { id: createDto.anime_id },
