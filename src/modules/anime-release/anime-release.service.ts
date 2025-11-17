@@ -197,7 +197,7 @@ export class AnimeReleaseService {
       await this.animeGenreService.updateAnimeGenres(anime.id, genreIds);
 
       // Получаем данные франшизы для обновления anime
-      const franchiseData = await this.getFranchiseData(release.id);
+      const franchiseData = await this.getFranchiseData(release);
       // Обновляем данные anime на основе франшизы, если данные получены
       if (franchiseData) {
         await this.updateAnimeFromFranchiseData(anime, franchiseData);
@@ -366,7 +366,7 @@ export class AnimeReleaseService {
           genreIds,
         );
 
-        const franchiseData = await this.getFranchiseData(apiAnime.id);
+        const franchiseData = await this.getFranchiseData(apiAnime);
         if (franchiseData) {
           await this.updateAnimeFromFranchiseData(animeRelease, franchiseData);
         }
@@ -620,23 +620,49 @@ export class AnimeReleaseService {
    * Получает данные франшизы по ID релиза из AniLibria API
    */
   private async getFranchiseData(
-    releaseId: number,
+    release: AniLibriaAnime,
   ): Promise<AniLibriaFranchiseResponse | null> {
+    const franchiseDataFromRelease: AniLibriaFranchiseResponse = {
+      id: release.id.toString(),
+      name: release.name.main,
+      name_english: release.name.english || '',
+      image: {
+        preview: release.poster?.preview || '',
+        thumbnail: release.poster?.thumbnail || '',
+        optimized: {
+          preview: release.poster?.optimized?.preview || '',
+          thumbnail: release.poster?.optimized?.thumbnail || '',
+        },
+      },
+      rating: 0,
+      last_year: release.year,
+      first_year: release.year,
+      total_releases: 1,
+      total_episodes: release.episodes_total || 0,
+      total_duration: '0',
+      total_duration_in_seconds: 0,
+      franchise_releases: [
+        {
+          sort_order: 0,
+          release_id: release.id,
+        },
+      ],
+    };
     try {
       const franchiseData = await this.fetchFromApi<
         AniLibriaFranchiseResponse[]
-      >(`/anime/franchises/release/${releaseId}`);
+      >(`/anime/franchises/release/${release.id}`);
 
       // API возвращает массив, берем первый элемент
       return franchiseData && franchiseData.length > 0
         ? franchiseData[0]
-        : null;
+        : franchiseDataFromRelease;
     } catch (error) {
       console.error(
-        `Error fetching franchise data for release ${releaseId}:`,
+        `Error fetching franchise data for release ${release.id}:`,
         error,
       );
-      return null;
+      return franchiseDataFromRelease;
     }
   }
 
