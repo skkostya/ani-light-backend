@@ -35,6 +35,29 @@ export class AnimeReleaseController {
     await this.animeReleaseService.syncAllAnime();
   }
 
+  @Get('sync-anime-links')
+  @ApiOperation({
+    summary: 'Синхронизировать связи anime-release с anime',
+    description:
+      'Находит все anime-release записи без связи с anime и связывает их с соответствующими anime записями на основе данных франшизы из API',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Синхронизация завершена',
+    schema: {
+      type: 'object',
+      properties: {
+        processed: { type: 'number', example: 100 },
+        linked: { type: 'number', example: 95 },
+        created: { type: 'number', example: 10 },
+        errors: { type: 'number', example: 5 },
+      },
+    },
+  })
+  async syncAnimeReleaseWithAnime() {
+    return await this.animeReleaseService.syncAnimeReleaseWithAnime();
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Получить список аниме',

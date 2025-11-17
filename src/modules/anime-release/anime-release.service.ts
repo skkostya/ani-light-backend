@@ -6,12 +6,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import * as dotenv from 'dotenv';
 import { ColorExtractorService } from 'src/common/services/color-extractor.service';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { HttpRetryService } from '../../common/services/http-retry.service';
 import { AnimeService } from '../anime/anime.service';
 import { AgeRatingService } from '../dictionaries/services/age-rating.service';
 import { GenreService } from '../dictionaries/services/genre.service';
+import { AniLibriaReleaseResponse } from '../episode/dto/anilibria-release-response.dto';
 import { Episode } from '../episode/entities/episode.entity';
 import { EpisodeService } from '../episode/episode.service';
 import { AnimeReleaseGenreService } from './anime-release-genre.service';
@@ -664,6 +665,180 @@ export class AnimeReleaseService {
       );
       return franchiseDataFromRelease;
     }
+  }
+
+  /**
+   * Получает данные франшизы по external_id релиза напрямую из API
+   */
+  private async getFranchiseDataByReleaseId(
+    releaseId: number,
+  ): Promise<AniLibriaFranchiseResponse | null> {
+    try {
+      const franchiseData = await this.fetchFromApi<
+        AniLibriaFranchiseResponse[]
+      >(`/anime/franchises/release/${releaseId}`);
+
+      // API возвращает массив, берем первый элемент
+      if (franchiseData && franchiseData.length > 0) {
+        return franchiseData[0];
+      }
+
+      // Если франшиза не найдена, получаем данные релиза для создания fallback данных
+      const releaseData = await this.fetchFromApi<AniLibriaReleaseResponse>(
+        `/anime/releases/${releaseId}`,
+      );
+
+      if (!releaseData) {
+        return null;
+      }
+
+      // Создаем данные франшизы на основе релиза
+      return {
+        id: releaseData.id.toString(),
+        name: releaseData.name.main,
+        name_english: releaseData.name.english || '',
+        image: {
+          preview: releaseData.poster?.preview || '',
+          thumbnail: releaseData.poster?.thumbnail || '',
+          optimized: {
+            preview: releaseData.poster?.optimized?.preview || '',
+            thumbnail: releaseData.poster?.optimized?.thumbnail || '',
+          },
+        },
+        rating: 0,
+        last_year: releaseData.year,
+        first_year: releaseData.year,
+        total_releases: 1,
+        total_episodes: releaseData.episodes_total || 0,
+        total_duration: '0',
+        total_duration_in_seconds: 0,
+        franchise_releases: [
+          {
+            sort_order: 0,
+            release_id: releaseData.id,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error(
+        `Error fetching franchise data for release ${releaseId}:`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Синхронизирует anime-release записи с anime записями
+   * Находит все anime-release с anime_id = null и связывает их с соответствующими anime
+   */
+  async syncAnimeReleaseWithAnime(): Promise<{
+    processed: number;
+    linked: number;
+    created: number;
+    errors: number;
+  }> {
+    console.log('Starting synchronization of anime-release with anime...');
+
+    // Находим все anime-release записи без связи с anime
+    const releasesWithoutAnime = await this.animeReleaseRepo.find({
+      where: { anime_id: IsNull() },
+      relations: [],
+    });
+
+    console.log(
+      `Found ${releasesWithoutAnime.length} anime-release records without anime_id`,
+    );
+
+    let processed = 0;
+    let linked = 0;
+    let created = 0;
+    let errors = 0;
+
+    for (const release of releasesWithoutAnime) {
+      // Пропускаем записи без external_id
+      if (!release.external_id) {
+        console.warn(`Skipping anime-release ${release.id} - no external_id`);
+        continue;
+      }
+
+      try {
+        processed++;
+
+        // Получаем данные франшизы по external_id релиза
+        const franchiseData = await this.getFranchiseDataByReleaseId(
+          release.external_id,
+        );
+
+        if (!franchiseData) {
+          console.warn(
+            `Could not get franchise data for release ${release.external_id}`,
+          );
+          errors++;
+          continue;
+        }
+
+        // Ищем существующее anime по external_id франшизы
+        let anime = await this.animeService.findOneByExternalId(
+          franchiseData.id,
+        );
+
+        const firstRelease = release.sort_order <= 1;
+        if (!anime) {
+          // Создаем новое anime на основе данных франшизы
+          anime = await this.animeService.createFromFranchiseData(
+            franchiseData,
+            firstRelease ? release.alias : undefined,
+          );
+          created++;
+          console.log(
+            `Created new anime from franchise: ${anime.name} (external_id: ${franchiseData.id})`,
+          );
+        } else {
+          // Обновляем существующее anime данными франшизы
+          anime = await this.animeService.updateFromFranchiseData(
+            anime,
+            franchiseData,
+          );
+          console.log(
+            `Updated existing anime from franchise: ${anime.name} (external_id: ${franchiseData.id})`,
+          );
+        }
+
+        // Связываем anime-release с anime
+        release.anime_id = anime.id;
+        release.sort_order =
+          franchiseData.franchise_releases.find(
+            (item) => item.release_id === release.external_id,
+          )?.sort_order ?? 0;
+
+        await this.animeReleaseRepo.save(release);
+        linked++;
+
+        console.log(
+          `Linked anime-release ${release.title_ru} (${release.external_id}) with anime ${anime.name} (${anime.external_id})`,
+        );
+
+        // Небольшая задержка, чтобы не перегружать API
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        errors++;
+        console.error(
+          `Error processing anime-release ${release.id} (external_id: ${release.external_id}):`,
+          error,
+        );
+      }
+    }
+
+    const result = {
+      processed,
+      linked,
+      created,
+      errors,
+    };
+
+    console.log('Synchronization completed:', result);
+    return result;
   }
 
   private async fetchFromApi<T>(endpoint: string): Promise<T> {
